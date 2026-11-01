@@ -22,6 +22,6 @@ int main(int argc,char **argv){QGuiApplication app(argc,argv);
  assert(tall.image.height()>=rendered.image.height()+5*115);assert(tall.html.count("<tr")==rendered.html.count("<tr"));
 
  t["cell_lines"]=11;failed=false;try{diaryTemplateCellLines(t);}catch(...){failed=true;}assert(failed);
- auto schema=diaryAnswerFormat()["schema"].toObject();assert(schema["required"].toArray().contains("template"));
+ auto schema=diaryAnswerSchema();assert(schema["required"].toArray().contains("template"));
  std::cout<<"PASS: exact checklist/table counts, literal labels, blank rows, malformed templates rejected\n";
 }

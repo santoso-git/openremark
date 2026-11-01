@@ -8,6 +8,8 @@ c++ -std=c++17 -fPIC tests/core.cpp -o build-host/core $(pkg-config --cflags --l
 QT_QPA_PLATFORM=offscreen ./build-host/core "$@"
 c++ -std=c++17 -fPIC tests/plot.cpp -o build-host/plot $(pkg-config --cflags --libs Qt6Gui Qt6Core)
 QT_QPA_PLATFORM=offscreen ./build-host/plot
+c++ -std=c++17 -fPIC tests/api.cpp -o build-host/api $(pkg-config --cflags --libs Qt6Network Qt6Core)
+QT_QPA_PLATFORM=offscreen ./build-host/api
 c++ -std=c++17 -fPIC tests/web.cpp -o build-host/web $(pkg-config --cflags --libs Qt6Network Qt6Gui Qt6Core)
 QT_QPA_PLATFORM=offscreen ./build-host/web
 c++ -std=c++17 -fPIC tests/markdown.cpp -o build-host/markdown $(pkg-config --cflags --libs Qt6Gui Qt6Core)
@@ -20,5 +22,4 @@ c++ -std=c++17 -fPIC tests/visuals.cpp -o build-host/visuals $(pkg-config --cfla
 QT_QPA_PLATFORM=offscreen ./build-host/visuals
 c++ -std=c++17 -fPIC tests/calendar.cpp -o build-host/calendar $(pkg-config --cflags --libs Qt6Gui Qt6Core)
 QT_QPA_PLATFORM=offscreen ./build-host/calendar
-c++ -std=c++17 -fPIC tests/email.cpp -o build-host/email $(pkg-config --cflags --libs Qt6Network Qt6Gui Qt6Core)
-QT_QPA_PLATFORM=offscreen ./build-host/email
+python3 tests/configure.py

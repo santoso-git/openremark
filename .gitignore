@@ -30,3 +30,12 @@ captures/
 # The instruction notebook is built from docs/notebook/build.py
 docs/notebook/claude-notebook.pdf
 docs/notebook/.notebook.html
+
+# Reference clones (local only)
+remarkable-chatgpt/
+remarkable-claude/
+vellum-ref/
+.DS_Store
+
+# Proxy
+proxy/node_modules/

@@ -1,0 +1,4 @@
+{"id":"gen-fixture","object":"chat.completion","model":"google/gemma-4-31b-it:free","choices":[{"index":0,"finish_reason":"stop","message":{"role":"assistant","content":"The **Burj Khalifa** in Dubai is the tallest building at 828 m, per [Wikipedia](https://en.wikipedia.org/wiki/Burj_Khalifa).","annotations":[
+ {"type":"url_citation","url_citation":{"url":"https://en.wikipedia.org/wiki/Burj_Khalifa","title":"Burj Khalifa - Wikipedia","content":"...","start_index":0,"end_index":10}},
+ {"type":"url_citation","url_citation":{"url":"https://en.wikipedia.org/wiki/Burj_Khalifa","title":"Burj Khalifa - Wikipedia","start_index":11,"end_index":20}},
+ {"type":"url_citation","url_citation":{"url":"https://example.org/a?x=1&y=2","title":"","start_index":21,"end_index":30}}]}}],"usage":{"prompt_tokens":10,"completion_tokens":20}}

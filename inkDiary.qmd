@@ -1,4 +1,4 @@
-; Ink Diary for Claude — notebook button (reMarkable 2).
+; openremark — Ask and Haiku buttons (reMarkable 2).
 ; DocumentView selector from rmitchellscott/xovi-qmd-extensions (GPL-3.0-only).
 AFFECT [[1224665461898798997]]
     IMPORT QtQuick 2.15
@@ -23,15 +23,14 @@ AFFECT [[1224665461898798997]]
                 border.width: 2
                 radius: 6
                 property bool diaryBusy: false
-                property string diaryMessage: "Claude"
-                property int diaryDrafts: 0
+                property string diaryMessage: "Ask"
                 property bool diaryError: false
                 XoviMessageBroker { id: inkDiaryBroker }
                 Image {
                     anchors.centerIn: parent
                     width: 44
                     height: 44
-                    source: "file:///home/root/.config/ink-diary/claude.svg"
+                    source: "file:///home/root/.config/ink-diary/ask.svg"
                     sourceSize.width: 44
                     sourceSize.height: 44
                     visible: !inkDiaryControl.diaryBusy
@@ -67,34 +66,6 @@ AFFECT [[1224665461898798997]]
                         color: "black"
                     }
                 }
-                // Send button: only while email drafts are pending. diary.cpp masks its rect out of captures.
-                Rectangle {
-                    anchors.right: parent.left
-                    anchors.rightMargin: 16
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 110
-                    height: 60
-                    color: "white"
-                    border.color: "black"
-                    border.width: 2
-                    radius: 6
-                    visible: inkDiaryControl.diaryDrafts > 0 && !inkDiaryControl.diaryBusy
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Send " + inkDiaryControl.diaryDrafts
-                        font.pixelSize: 24
-                        font.bold: true
-                        color: "black"
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: {
-                            statusTimer.stop();
-                            inkDiaryControl.diaryBusy = true;
-                            inkDiaryBroker.sendSimpleSignal("ink-diary$send", "");
-                        }
-                    }
-                }
                 Timer { id: statusTimer; interval: 5000 }
                 MouseArea {
                     anchors.fill: parent
@@ -119,11 +90,100 @@ AFFECT [[1224665461898798997]]
                             if (inkDiaryControl.diaryBusy && !result.busy) statusTimer.restart();
                             inkDiaryControl.diaryBusy = result.busy;
                             inkDiaryControl.diaryMessage = result.message;
-                            inkDiaryControl.diaryDrafts = result.drafts || 0;
                             inkDiaryControl.diaryError = result.error === true;
                         } catch (error) {
                             inkDiaryControl.diaryBusy = false;
                             inkDiaryControl.diaryMessage = "Ink Diary extension unavailable";
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                id: inkDiaryPremium
+                z: 10000
+                // Second button, one toolbar cell below Ask: the same request with
+                // premium_model (Haiku). diary.cpp masks this rect out of the capture too.
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.topMargin: 250
+                anchors.rightMargin: 26
+                width: 60
+                height: 60
+                color: "white"
+                border.color: "black"
+                border.width: 2
+                radius: 6
+                Image {
+                    anchors.centerIn: parent
+                    width: 40
+                    height: 40
+                    source: "file:///home/root/.config/ink-diary/ask-haiku.svg"
+                    sourceSize.width: 40
+                    sourceSize.height: 40
+                    visible: !inkDiaryControl.diaryBusy
+                }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 26
+                    height: 26
+                    color: "black"
+                    visible: inkDiaryControl.diaryBusy
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onPressAndHold: statusTimer.restart()
+                    onClicked: {
+                        statusTimer.stop();
+                        if (inkDiaryControl.diaryBusy) {
+                            inkDiaryBroker.sendSimpleSignal("ink-diary$cancel", "");
+                        } else {
+                            inkDiaryControl.diaryBusy = true;
+                            inkDiaryBroker.sendSimpleSignal("ink-diary$start", "premium");
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                id: inkDiaryTools
+                z: 10000
+                // Third button, one toolbar cell below Haiku: the same request through the
+                // MCP proxy at tools_base_url. diary.cpp masks this rect out of the capture too.
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.topMargin: 362
+                anchors.rightMargin: 26
+                width: 60
+                height: 60
+                color: "white"
+                border.color: "black"
+                border.width: 2
+                radius: 6
+                Image {
+                    anchors.centerIn: parent
+                    width: 40
+                    height: 40
+                    source: "file:///home/root/.config/ink-diary/ask-tools.svg"
+                    sourceSize.width: 40
+                    sourceSize.height: 40
+                    visible: !inkDiaryControl.diaryBusy
+                }
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 26
+                    height: 26
+                    color: "black"
+                    visible: inkDiaryControl.diaryBusy
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onPressAndHold: statusTimer.restart()
+                    onClicked: {
+                        statusTimer.stop();
+                        if (inkDiaryControl.diaryBusy) {
+                            inkDiaryBroker.sendSimpleSignal("ink-diary$cancel", "");
+                        } else {
+                            inkDiaryControl.diaryBusy = true;
+                            inkDiaryBroker.sendSimpleSignal("ink-diary$start", "tools");
                         }
                     }
                 }

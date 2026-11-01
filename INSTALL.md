@@ -1,30 +1,35 @@
-# Ink Diary for Claude — installation and configuration
+# openremark — installation and configuration
 
-This takes about 15 minutes. Steps 1–6 were run exactly as written on a reMarkable 2 with OS 3.28.0.172 on 2026-10-25.
+This takes about 20 minutes. The steps below were run exactly as written on a reMarkable 2 with **OS 3.29.1.0** (Qt 6.10.3) on 2026-10-31, with the plugin built from the 3.28.0.172 SDK (also Qt 6.10.3).
 
 ## Requirements
 
-- **reMarkable 2.** The checked-in plugin is built for OS 3.28.0.172 (Qt 6.10.3); check yours under Settings → General → Help → About. Other OS versions need a build with their matching SDK (see "Build and test" in README.md). The installer warns on untested versions, and the plugin refuses to load on an incompatible Qt.
-- A computer with `ssh` and `git` (macOS or Linux), and a USB cable.
+- **reMarkable 2.** Check the OS under Settings → General → Help → About. The plugin loads when the tablet's Qt has the same major version as the build and at least its minor version; other versions need a build with their SDK (see "Build and test" in README.md).
+- A computer with `ssh` and `git` (macOS or Linux) and a USB **data** cable.
 - Tablet Wi-Fi, for package downloads and API requests.
-- An Anthropic API key with credits. In the [Claude Console](https://platform.claude.com), add credits under **Billing**, then use **API Keys → Create Key** and copy it (it starts with `sk-ant-` and is shown only once). A Claude.ai subscription does not include API access.
+- An [OpenRouter](https://openrouter.ai) API key from [openrouter.ai/keys](https://openrouter.ai/keys), or the key of another OpenAI-compatible service.
 
-The plugin, xovi and Vellum all install under `/home/root`; the system partition is not modified. xovi is *tethered*: a reboot always returns the tablet to stock, and step 6 brings the plugin back. Notebooks are unaffected, but keep them synced or backed up anyway.
+The plugin, xovi and Vellum install under `/home/root`. xovi is *tethered*: after a reboot the tablet is stock again, and step 6 brings the plugin back. Notebooks are unaffected.
 
 ## 1. Enable SSH access
 
-Connect the tablet over USB. The root password is at the bottom of **Settings → General → Help → About → Copyrights and licenses → GPLv3 Compliance**, along with the tablet's IP addresses (`10.11.99.1` over USB).
+The root password and the tablet's IP addresses are at the bottom of **Settings → General → Help → Copyrights and licenses → GPLv3 Compliance** (`10.11.99.1` over USB, plus the Wi-Fi address). Keep the password private.
 
-On your computer, install a key so you don't need the password again:
+On OS versions above 3.20, SSH over Wi-Fi is off until you have connected over USB once. Plug the tablet in, wake and unlock it, and on your computer:
 
 ```sh
-ssh-keygen -t ed25519 -f ~/.ssh/remarkable_ed25519 -N ""
-ssh-copy-id -i ~/.ssh/remarkable_ed25519.pub root@10.11.99.1     # enter the tablet password once
-printf 'Host remarkable\n  HostName 10.11.99.1\n  User root\n  IdentityFile ~/.ssh/remarkable_ed25519\n' >> ~/.ssh/config
-ssh remarkable 'grep RELEASE_VERSION /usr/share/remarkable/update.conf'
+ssh-keygen -t ed25519 -f ~/.ssh/remarkable -N ""
+ssh -o PubkeyAuthentication=no root@10.11.99.1 'mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys && rm-ssh-over-wlan on && echo DONE' < ~/.ssh/remarkable.pub
 ```
 
-The commands below use the `remarkable` host alias.
+Enter the tablet password when asked. This installs your key and turns on SSH over Wi-Fi in one connection; the setting survives OS updates. Then add a host alias with the tablet's Wi-Fi address:
+
+```sh
+printf '\nHost remarkable\n    HostName 192.168.1.206\n    User root\n    IdentityFile ~/.ssh/remarkable\n    IdentitiesOnly yes\n' >> ~/.ssh/config
+ssh remarkable 'cat /etc/os-release | grep IMG_VERSION; ls /usr/lib/libQt6Core.so.*'
+```
+
+If the USB connection times out: use a data cable directly in the computer (no hub), keep the tablet awake and unlocked, and on macOS allow the accessory when asked. The USB link can drop when the tablet goes to sleep, which is why the command above does everything in one connection.
 
 ## 2. Install Vellum and xovi
 
@@ -37,16 +42,16 @@ export PATH=/home/root/.vellum/bin:$PATH
 vellum add xovi
 ```
 
-The checksum is the one published in the Vellum README; if it doesn't match, the bootstrap script was updated, so take the current command from there. The bootstrap verifies everything it downloads.
+The checksum is the one published in the Vellum README; if it doesn't match, the bootstrap script was updated, so take the current command from there.
 
 ## 3. Copy this repository to the tablet
 
 On your computer:
 
 ```sh
-git clone https://github.com/jonaslaberg/remarkable-claude ink-diary-claude
-cd ink-diary-claude
-git archive --format=tar HEAD | ssh remarkable 'rm -rf /home/root/ink-diary-claude && mkdir -p /home/root/ink-diary-claude && tar -xf - -C /home/root/ink-diary-claude'
+git clone https://github.com/santoso-git/openremark
+cd openremark
+git archive --format=tar HEAD | ssh remarkable 'rm -rf /home/root/openremark && mkdir -p /home/root/openremark && tar -xf - -C /home/root/openremark'
 ```
 
 ## 4. Verify and install
@@ -54,21 +59,21 @@ git archive --format=tar HEAD | ssh remarkable 'rm -rf /home/root/ink-diary-clau
 On the tablet:
 
 ```sh
-cd /home/root/ink-diary-claude
+cd /home/root/openremark
 sha256sum -c SHA256SUMS | grep -v ': OK$'     # prints nothing when every file verifies
 export PATH=/home/root/.vellum/bin:$PATH
 sh install.sh
 ```
 
-The installer checks the hardware and OS, installs xovi's extensions through Vellum (`qt-resource-rebuilder`, `xovi-message-broker`, `framebuffer-spy`, `rm-shot`), and copies the plugin, notebook patch, fonts, icon and configuration helper. It keeps an existing API configuration.
+The installer warns that your OS version is untested unless it is listed in `install.sh`; that is expected. It installs xovi's extensions through Vellum (`xovi-extensions` with `qt-resource-rebuilder`, `xovi-message-broker`, `framebuffer-spy`, and `rm-shot`) and copies the plugin, the button patch, fonts, icon and `configure.sh`.
 
-Then build xovi's hashtable, which maps the notebook app's internal names so the patch can find where to put the button. **This step is required; without it the button never appears.** Run it once after installing, and again after every OS update:
+Then build xovi's hashtable, which lets the patch find where to put the button. **Without it the button never appears.** Run it once after installing and again after every OS update:
 
 ```sh
 bash /home/root/xovi/rebuild_hashtable
 ```
 
-It stops the notebook app and asks you to press Enter. The app then runs once on its own; if the tablet shows its passcode screen, enter your passcode. It ends by itself when it prints `Hashtable rebuilt`.
+It stops the notebook app and asks you to press Enter. The app runs once on its own; enter your passcode if the tablet asks. It is done when it prints `Hashtable rebuilt`. The notebook app stays stopped afterwards; step 6 starts it.
 
 ## 5. Configure your API key
 
@@ -76,99 +81,79 @@ It stops the notebook app and asks you to press Enter. The app then runs once on
 sh /home/root/.config/ink-diary/configure.sh
 ```
 
-Paste your API key at the hidden prompt, then press Enter at the model prompt for the default, `claude-sonnet-5-5`. Any Claude model that supports image input and structured outputs works, for example `claude-opus-5-5` (slower, more capable) or `claude-haiku-5-5` (fastest, cheapest). Web search also needs the web search tool, which an organization admin can disable in the Claude Console.
+It asks for:
 
-The key is stored only on your tablet in `/home/root/.config/ink-diary/config.json`, with owner-only permissions. Requests go directly from your tablet to Anthropic. Don't share that file.
+1. **API key** (hidden): paste it once. An OpenRouter key starts with `sk-or-` and is about 70 characters.
+2. **API base URL:** Enter for OpenRouter. For a local server or the [MCP proxy](proxy/README.md), give its address ending in `/v1`; plain `http` only works for local network addresses.
+3. **Model:** Enter for `nvidia/nemotron-3.5-super-vl:free`, or any model that reads images (see "Free models" in README.md).
+4. **Timezone:** for example `Europe/Stockholm`.
 
-To change only the model later, keeping your key and other settings: `sh /home/root/.config/ink-diary/configure.sh --model MODEL_NAME`. Settings are read on each tap, so no restart is needed.
+The key is stored only on the tablet in `/home/root/.config/ink-diary/config.json`, readable only by root. To check the key without using your free quota:
 
-Optional settings can be added to `config.json` (keep the JSON valid and run `chmod 600` on it afterwards):
+```sh
+K=$(sed -E 's/.*"api_key":"([^"]*)".*/\1/' /home/root/.config/ink-diary/config.json); wget -q -O - --header "Authorization: Bearer $K" https://openrouter.ai/api/v1/key; unset K
+```
 
-- `timezone`: IANA timezone name, such as `Europe/London`. Default: `America/New_York`. Used for "today", "now" and the checked-at time on web answers.
-- `effort`: `low`, `medium`, `high`, `xhigh` or `max`. Trades answer depth for speed and cost. Default: the model's own default (`high` on Sonnet 5.5, `medium` on Opus 5.5 and Haiku 5.5). `low` gives the snappiest answers.
-- `demo_mode`: `true` for an offline fixed handwriting sample, `false` for normal API use. Demo mode does not test diagrams or calendars.
+`401 Unauthorized` means the key was not pasted correctly. The answer also shows your free-model limit per day.
 
-## 6. Start Ink Diary (and after every reboot)
+Optional settings in `config.json` (keep the JSON valid and `chmod 600` it afterwards):
+
+- `web_search`: `false` turns web search off. Searches cost money even with free models.
+- `effort`: `low`, `medium` or `high`, sent as OpenRouter's `reasoning.effort` to models that reason.
+- `premium_model` and `premium_effort`: the model and reasoning effort of the Haiku button. Defaults: `anthropic/claude-haiku-5.5` and `none`.
+- `tools_base_url`, `tools_api_key` and `tools_model`: the third button (a wrench) sends the question to the optional [MCP proxy](proxy/README.md) instead of OpenRouter. `tools_base_url` is the proxy's address ending in `/v1`, `tools_api_key` the proxy's `client_key`. `tools_model` defaults to the Haiku button's model. To give the button an icon of your own, replace `/home/root/.config/ink-diary/ask-tools.svg` with a square SVG; reinstalling keeps it. Without the first two the button only says what is missing. Set them with `config-model --set KEY`, which reads the value from stdin.
+- `demo_mode`: `true` for an offline handwriting sample without any API request.
+
+To change only the model later: `sh /home/root/.config/ink-diary/configure.sh --model MODEL_NAME`. Settings are read on each tap.
+
+## 6. Start the plugin (and after every reboot)
 
 ```sh
 bash /home/root/xovi/start
 ```
 
-This restarts the notebook app with the extensions loaded; the screen returns to the library. Open a notebook in portrait orientation at normal zoom; the Claude button (an asterisk) appears at the top right, just under the toolbar's close button.
+This restarts the notebook app with the extensions loaded; the screen returns to the library. Open a notebook in portrait orientation at normal zoom; the **Ask** button (a question mark) is at the top right, under the toolbar's close button, with the **Haiku** button (a lightning bolt) and the **tools** button (a wrench) below it. To test without an API key first, put `{"demo_mode":true}` in `config.json`.
 
-**After every reboot the button is gone**, because xovi deliberately doesn't start on boot. Don't make xovi start automatically by editing systemd files: xovi's README warns this can leave the tablet stuck in a boot loop. Instead, use one of these:
+**After every reboot the button is gone**, because xovi deliberately doesn't start on boot. Don't make it start automatically by editing systemd files: xovi's README warns this can leave the tablet in a boot loop. Either run `xovi/start` again over SSH, or install [xovi-tripletap](https://github.com/rmitchellscott/xovi-tripletap) and triple-press the power button after a reboot:
 
-- **Without a computer (recommended):** install [xovi-tripletap](https://github.com/rmitchellscott/xovi-tripletap), the starter the xovi README recommends. Then **triple-press the power button** after a reboot to start xovi.
-  ```sh
-  export PATH=/home/root/.vellum/bin:$PATH
-  vellum add tripletap
-  ```
-  It adds a small systemd service (`xovi-tripletap`) to the system partition that only listens for the power button; a plain reboot still comes up stock. Remove it with `vellum del tripletap`. After an OS update, run `vellum reenable` to restore it.
-- **Over SSH:** run `bash /home/root/xovi/start` again.
+```sh
+export PATH=/home/root/.vellum/bin:$PATH
+vellum add tripletap
+```
 
 ## 7. Use it
 
-Write in the visible page area, away from the Claude button in the top-right corner. The top edge is included. Tap the icon and keep the page still while it works. Tap the stop square to cancel. Hold the icon to see status.
+Write in the visible page area, away from the button. Tap **Ask** and keep the page still; the button becomes a stop square while it works (tap it to cancel). Hold the button to see the last status. An answer typically takes 10–30 seconds with a free model.
+
+The **Haiku** button sends the same question to a paid model instead: by default `anthropic/claude-haiku-5.5` with reasoning off. It costs a fraction of a cent per question on your OpenRouter credits; web searches cost extra.
 
 Try:
 
 - `Why does the Moon shine?`
-- `Create an October 2026 calendar` — dates are computed locally; October starts Thursday. Cells default to three writing lines. Ask for Monday-start if preferred.
-- `Create a flow diagram of making tea` — compact wrapping flowchart.
+- `plot y = x^2`
+- `Search weather in Stockholm today` — the sources are saved beside the answer, not shown on the page.
 - `Create a 10 item checklist without labels`
-- `plot y=x^2`
-- `Search the weather in Lowell MA right now`
-- `Create a Venn diagram comparing cats and dogs`
+- `Create a flow diagram of making tea`
 
-Answers append below existing content and may extend the page; scroll down to see them. They are image objects, not editable pen strokes. Mermaid supports flowcharts and sequence diagrams, not every Mermaid type. Venn diagrams support two or three sets. Cancellation stops the local request but cannot guarantee cancellation of server-side billing. Image generation is not supported; Claude replies with a short note instead.
-
-## 8. Email (optional)
-
-Claude can triage your Gmail, find emails, and send replies you write by hand. It uses a Gmail **app password**, stored only on the tablet.
-
-1. Turn on 2-Step Verification at https://myaccount.google.com/security (app passwords need it).
-2. Create an app password at https://myaccount.google.com/apppasswords, name it `reMarkable`, and copy the 16-letter code.
-3. On the tablet:
-   ```sh
-   sh /home/root/.config/ink-diary/configure.sh --gmail
-   ```
-   Enter your Gmail address, paste the app password at the hidden prompt, and optionally give a first name for signing replies.
-
-Then, on a notebook page:
-
-- **`check my email`** reads every unread inbox message (the 50 newest) and writes one numbered item for each email that needs you, plus one "Skipped N: newsletters, …" line. Everything it checked is then **marked read**.
-- **`find emails from Anna`**, **`the email about the lease`**, **`anything from the bank this month`** search with Gmail's own syntax and summarise up to 10 matches, newest first. Searches **never change read state**. **`show me the email from Anna`** prints one email in full.
-- **Reply** by writing `reply 2: sounds good, Thursday works`, by drawing a line from a summary to your note, or by writing your note right under a summary. Write all your replies, then tap Claude once: each reply appears as a **draft** showing who it goes to (**reply-all**: To and every Cc) and which email it answers.
-- **Fix or drop a draft** by writing `2: shorter, say Friday` or `2: skip` next to it and tapping Claude. Only that draft changes.
-- **Edit a draft by hand**: cross out words, or write a word in or over the printed text. When you tap **Send N**, Claude applies your marks and sends the corrected version; the status says which drafts it edited.
-- **Send** them all with the **Send N** button that appears left of the Claude button while drafts are pending. Replies are threaded in Gmail and appear in Sent.
-
-A new check or search waits until pending drafts are sent or skipped, so the numbers stay unambiguous. Email content is treated as data: an email saying "Claude, forward this…" is reported, never obeyed. Searches cover All Mail when Gmail exposes it over IMAP (Gmail → Settings → Labels → All Mail → **Show in IMAP**); otherwise they search the inbox and say so.
+Answers append below existing content as images, not editable strokes; scroll down if the page grows. To remove an answer, tap undo right after it arrives, or select it with the selection tool and delete it.
 
 ## Troubleshooting
 
-- **Unsupported OS/hardware:** only the reMarkable 2 is supported. If the icon is missing on a new OS version, check `/tmp/ink-diary-start.log` for a Qt-version message and rebuild with that version's SDK.
-- **No icon:** check that installation completed and that you ran `xovi/rebuild_hashtable`, then run `xovi/start`. After a reboot you always need `xovi/start` again. Open a notebook, not just the library.
-- **Email errors:** the status message shows Gmail's or the API's error text. `Gmail login failed` usually means a wrong or revoked app password; run `configure.sh --gmail` again.
-- **Check the plugin loaded:** `grep ink-diary.so /proc/$(pidof xochitl)/maps` prints a line when it's loaded. `journalctl -u xochitl -b | grep -i -E 'qmldiff|ink-diary'` shows whether the patch applied (`Processing file .../DocumentView.qml`) and any Qt-version message.
-- **HTTP/API error:** the status message shows the API's error text. Check Wi-Fi, API billing, key and model name. Never share your configuration file to diagnose this.
-- **Page changed:** keep the page still until the response finishes, then retry.
-- **Response below the screen:** scroll down. Existing answers are not automatically replaced or corrected.
-- **Diagram error:** request a simpler flowchart/sequence diagram with short labels. Limits are described in README.md.
+- **No button:** check that `install.sh` finished and that you ran `xovi/rebuild_hashtable`, then `xovi/start`. Open a notebook, not the library. `journalctl -u xochitl -b | grep -E 'qmldiff|rm-shot|not loading'` shows whether the patch applied (`Processing file .../DocumentView.qml`) and any Qt-version message from the plugin.
+- **Answer incomplete:** the model ran out of tokens. Reasoning models spend much of the budget thinking; the plugin allows 16,000 tokens. Try a shorter question or another model.
+- **API key rejected (HTTP 401):** run `configure.sh` again; check the key as in step 5.
+- **Daily free limit reached:** OpenRouter allows 50 free-model requests a day, or 1000 once your account has bought at least 10 USD of credits.
+- **Page changed:** keep the page still until the answer arrives, then retry.
 
 ## Remove or restore
 
 ```sh
-cd /home/root/ink-diary-claude
+cd /home/root/openremark
 sh uninstall.sh
 ```
 
-Restart the notebook app using the start command above. Uninstallation removes the plugin and QML patch; it keeps configuration and generated answer files. To remove your stored credential as well, delete only `/home/root/.config/ink-diary/config.json` after uninstalling. Do not share your answer directory: it can contain notebook-derived text and images.
+Restart the notebook app with `xovi/start` (or reboot for a stock tablet). Uninstalling removes the plugin and the button patch and keeps `config.json` and the answer files; delete `config.json` yourself to remove the stored key. `vellum self uninstall --all` removes Vellum, xovi and its extensions.
 
-To restore this version later, verify the archive, run its installer, and restart from the library. Skip full configuration to preserve existing settings.
+## Privacy
 
-## Sharing and privacy
-
-Share this repository or a release archive made from its committed files, together with this guide. Do not create a new archive from your tablet's installed configuration or answer directories. The included `config.example.json` contains only a placeholder. API credentials, notebook content, diagnostic screenshots and generated artwork are excluded from this release.
-
-The visible notebook crop is sent to Anthropic when you tap the button. Web searches send the rewritten question in a second request. Rendering diagrams is local after transcription. See README.md for network behavior and limits, THIRD_PARTY.md for attribution, and LICENSE for redistribution terms.
+The visible notebook crop is sent to `{base_url}/chat/completions` when you tap the button; web searches send the rewritten question in a second request. With OpenRouter, the data policy of OpenRouter and of the provider serving the model applies, and free models may log prompts. Share this repository or a release archive made from its committed files, never your tablet's configuration or answer directories.

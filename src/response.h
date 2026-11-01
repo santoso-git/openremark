@@ -1,30 +1,34 @@
 #pragma once
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QRegularExpression>
 #include <QString>
+#include <QStringList>
 #include <stdexcept>
-inline void diaryRequireComplete(const QJsonObject &root) {
-    QString stop=root.value("stop_reason").toString();
-    if(stop=="refusal")throw std::runtime_error("Claude declined this request");
-    if(stop=="max_tokens")throw std::runtime_error("Answer incomplete; try a shorter question");
-    if(stop!="end_turn")throw std::runtime_error(stop.isEmpty() ? "Invalid API response" : QString("Answer stopped early (%1); please try again").arg(stop).toStdString());
-}
-// After a server-side fallback the content holds a fallback block; only what follows it is the answer.
-inline QJsonArray diaryFinalContent(const QJsonObject &root) {
-    auto content=root.value("content").toArray();
-    int start=0;
-    for(int i=0;i<content.size();++i)if(content[i].toObject().value("type").toString()=="fallback")start=i+1;
-    QJsonArray out;for(int i=start;i<content.size();++i)out.append(content[i]);
-    return out;
-}
+// Chat completions: choices[0].message.content, only after a clean stop.
 inline QString responseText(const QJsonObject &root) {
-    diaryRequireComplete(root);
-    QString text;
-    for(auto value:diaryFinalContent(root)) {
-        auto item=value.toObject();
-        if(item.value("type").toString()=="text") text+=item.value("text").toString();
-    }
+    auto choices=root.value("choices").toArray();
+    if(choices.isEmpty())throw std::runtime_error("Invalid API response");
+    auto choice=choices.first().toObject();
+    auto message=choice.value("message").toObject();
+    QString finish=choice.value("finish_reason").toString();
+    if(finish=="length")throw std::runtime_error("Answer incomplete; try a shorter question");
+    if(finish=="content_filter"||!message.value("refusal").toString().isEmpty())throw std::runtime_error("The model declined this request");
+    if(finish!="stop")throw std::runtime_error(finish.isEmpty() ? "Invalid API response" : QString("Answer stopped early (%1); please try again").arg(finish).toStdString());
+    QString text=message.value("content").toString();
     if(text.trimmed().isEmpty() || text.size()>16000)
         throw std::runtime_error("Empty or oversized answer");
     return text.trimmed();
+}
+// The generation id lets the logged prompt and answer be looked up at OpenRouter; only plain ids are kept.
+inline void diaryKeepGenerationId(QStringList &ids,const QJsonObject &root) {
+    static const QRegularExpression plain("^[A-Za-z0-9_-]{1,100}$");
+    QString id=root.value("id").toString();
+    if(plain.match(id).hasMatch())ids.append(id);
+}
+// Free models often wrap JSON in a code fence or a sentence: keep the outermost object.
+inline QString diaryExtractJson(const QString &text) {
+    int start=text.indexOf('{'),end=text.lastIndexOf('}');
+    if(start<0||end<start)return text;
+    return text.mid(start,end-start+1);
 }

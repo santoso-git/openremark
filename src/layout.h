@@ -3,13 +3,15 @@
 #include <QRect>
 // Include the top edge; only the side toolbar and bottom button margins are excluded.
 inline QRect diaryCaptureArea() { return QRect(150,0,1174,1752); }
-// The Claude button (inkDiary.qmd): one toolbar cell under the close button.
+// The Ask button (inkDiary.qmd): one toolbar cell under the close button.
 inline QRect diaryButtonRect() { return QRect(1292,112,112,112); }
-// The Send button (inkDiary.qmd) appears left of it while email drafts are pending.
-inline QRect diarySendButtonRect() { return QRect(1180,112,124,112); }
-// Keep our own buttons out of the page photo, the ink search and the unchanged-page check.
+// The Haiku button: the next toolbar cell below Ask.
+inline QRect diaryPremiumButtonRect() { return QRect(1292,224,112,112); }
+// The tools button (MCP proxy): the next toolbar cell below the Haiku button.
+inline QRect diaryToolsButtonRect() { return QRect(1292,336,112,112); }
+// Keep our own button out of the page photo, the ink search and the unchanged-page check.
 inline void diaryMaskControls(QImage &screen) {
-    for(const QRect &r:{diaryButtonRect(),diarySendButtonRect()})
+    for(const QRect &r:{diaryButtonRect(),diaryPremiumButtonRect(),diaryToolsButtonRect()})
         for(int y=r.top();y<=r.bottom()&&y<screen.height();++y)
             for(int x=r.left();x<=r.right()&&x<screen.width();++x)
                 screen.setPixelColor(x,y,Qt::white);

@@ -1,5 +1,6 @@
 #pragma once
 #include "templates.h"
+#include "response.h"
 #include <QImage>
 #include <QPainter>
 #include <QJsonDocument>
@@ -43,28 +44,12 @@ public:
     explicit PlotExpression(QString expression):source(expression){if(source.isEmpty()||source.size()>160)bad();eval(0);}
     double eval(double x){pos=0;variable=x;double v=sum();take(QChar(0));if(pos!=source.size())bad();return v;}
 };
-struct DiaryAnswer {QString text,expression,command;double xmin=-5,xmax=5;bool plot=false,search=false,calendar=false;QString diagram;int cellLines=1;
-    bool emailCheck=false,emailSearch=false,emailFull=false;QString emailQuery;QVector<QPair<int,QString>> emailReplies;};
+struct DiaryAnswer {QString text,expression,command;double xmin=-5,xmax=5;bool plot=false,search=false,calendar=false;QString diagram;int cellLines=1;};
 inline DiaryAnswer decodeDiaryAnswer(const QString &raw){
-    auto doc=QJsonDocument::fromJson(raw.toUtf8());
+    auto doc=QJsonDocument::fromJson(diaryExtractJson(raw).toUtf8());
     if(!doc.isObject())throw std::runtime_error("Could not read structured answer; please try again");
     auto obj=doc.object();DiaryAnswer result;result.command=obj.value("command").toString().trimmed();
     QString kind=obj.value("kind").toString();
-    auto email=obj.value("email").toObject();
-    if(kind=="email_check") {result.emailCheck=true;return result;}
-    if(kind=="email_search") {
-        result.emailSearch=true;result.emailQuery=email.value("query").toString().trimmed();result.emailFull=email.value("full").toBool();
-        if(result.emailQuery.isEmpty()||result.emailQuery.size()>300)throw std::runtime_error("Could not read what to search for");
-        return result;
-    }
-    if(kind=="email_reply") {
-        for(auto v:email.value("replies").toArray()) {
-            auto r=v.toObject();int n=r.value("n").toInt();QString instruction=r.value("instruction").toString().trimmed();
-            if(n>=1&&!instruction.isEmpty()&&instruction.size()<=2000) result.emailReplies.append({n,instruction});
-        }
-        if(result.emailReplies.isEmpty())throw std::runtime_error("Write reply N: ... next to an email");
-        return result;
-    }
     if(kind=="mermaid" || kind=="venn") {
         result.text=obj.value("text").toString().trimmed();
         if(result.text.isEmpty() || result.text.size()>12000)throw std::runtime_error("Visual description missing or too long");
@@ -80,28 +65,23 @@ inline DiaryAnswer decodeDiaryAnswer(const QString &raw){
     if(!QRegularExpression("^\\s*plot\\s+\\S",QRegularExpression::CaseInsensitiveOption).match(command).hasMatch())
         throw std::runtime_error("Write plot followed by an equation");
     result.plot=true;result.expression=obj.value("expression").toString();
-    if(!obj.value("xmin").isDouble()||!obj.value("xmax").isDouble())throw std::runtime_error("Invalid plot range");
-    result.xmin=obj.value("xmin").toDouble();result.xmax=obj.value("xmax").toDouble();
+    // A missing range is the default -5..5; a range that is present must be numeric.
+    for(auto bound:{"xmin","xmax"})if(obj.contains(bound)&&!obj.value(bound).isDouble())throw std::runtime_error("Invalid plot range");
+    result.xmin=obj.value("xmin").toDouble(-5);result.xmax=obj.value("xmax").toDouble(5);
     if(!std::isfinite(result.xmin)||!std::isfinite(result.xmax)||result.xmin>=result.xmax ||
         std::abs(result.xmin)>1000000 || std::abs(result.xmax)>1000000 || result.xmax-result.xmin<0.000001)
         throw std::runtime_error("Plot range must be increasing, within +/-1000000");
     PlotExpression check(result.expression);return result;
 }
-inline QJsonObject diaryAnswerFormat(){
+inline QJsonObject diaryAnswerSchema(){
     QJsonObject props;
     for(auto name:{"kind","text","command","expression"})props.insert(name,QJsonObject{{"type","string"}});
-    props.insert("kind",QJsonObject{{"type","string"},{"enum",QJsonArray{"text","plot","search","checklist","table","mermaid","venn","calendar","email_check","email_search","email_reply"}}});
+    props.insert("kind",QJsonObject{{"type","string"},{"enum",QJsonArray{"text","plot","search","checklist","table","mermaid","venn","calendar"}}});
     props.insert("template",diaryTemplateSchema());
     props.insert("calendar",diaryCalendarSchema());
     props.insert("xmin",QJsonObject{{"type","number"}});props.insert("xmax",QJsonObject{{"type","number"}});
-    QJsonObject reply{{"type","object"},{"additionalProperties",false},{"required",QJsonArray{"n","instruction"}},
-        {"properties",QJsonObject{{"n",QJsonObject{{"type","integer"}}},{"instruction",QJsonObject{{"type","string"}}}}}};
-    props.insert("email",QJsonObject{{"type","object"},{"additionalProperties",false},{"required",QJsonArray{"query","full","replies"}},
-        {"properties",QJsonObject{{"query",QJsonObject{{"type","string"}}},{"full",QJsonObject{{"type","boolean"}}},
-            {"replies",QJsonObject{{"type","array"},{"items",reply}}}}}});
-    return {{"type","json_schema"},
-        {"schema",QJsonObject{{"type","object"},{"properties",props},{"additionalProperties",false},
-        {"required",QJsonArray{"kind","text","command","expression","xmin","xmax","template","calendar","email"}}}}};
+    return {{"type","object"},{"properties",props},{"additionalProperties",false},
+        {"required",QJsonArray{"kind","text","command","expression","xmin","xmax","template","calendar"}}};
 }
 inline QImage renderPlot(const DiaryAnswer &a,int width,int available){
     if(available<480)throw std::runtime_error("Not enough room for graph; write near the top of a fresh page");

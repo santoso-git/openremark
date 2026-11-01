@@ -24,8 +24,3 @@ with
     xovi-message-broker$simpleSignal = "ink-diary$probe"
     xovi-message-broker$version = 1
 end
-export diary_send
-with
-    xovi-message-broker$simpleSignal = "ink-diary$send"
-    xovi-message-broker$version = 1
-end

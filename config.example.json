@@ -1,4 +1,7 @@
 {
-  "api_key": "REPLACE_WITH_YOUR_ANTHROPIC_API_KEY",
-  "model": "claude-sonnet-5-5"
+  "api_key": "REPLACE_WITH_YOUR_API_KEY",
+  "base_url": "https://openrouter.ai/api/v1",
+  "model": "nvidia/nemotron-3.5-super-vl:free",
+  "web_search": true,
+  "timezone": "UTC"
 }

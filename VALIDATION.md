@@ -1,5 +1,28 @@
 # Validation status
 
+## openremark 0.3.0 and the MCP proxy — reMarkable 2, OS 3.29.1.0 (2026-11-01)
+
+- Proxy at 2011570 running in Docker (Coolify) on a VPS behind HTTPS, configured through `CONFIG_JSON`, with one MCP server: the author's own content tool, reached with a personal key over Streamable HTTP. Proxy tests 46/46 and typecheck pass.
+- Wrench button on the tablet (0.3.0) with `tools_base_url` and `tools_api_key`; model `anthropic/claude-haiku-5.5`, reasoning off.
+- Before 2011570 the model got only the service name. Asked on the page to create a newsletter draft, it used no tool, wrote the text itself and invented a discount code. 2011570 passes each server's own MCP instructions to the model, tells it to use a service's tools for anything in that service, and forbids inventing codes, prices or offers.
+- After 2011570, from a direct request to the proxy: "How many newsletters are drafts right now?", which does not name the service. The model called the service's newsletter list tool and answered with the real draft, in about 4 s.
+- From the tablet: a handwritten request to create a draft. The model read the page in the same call, called the service's tool for creating ideas, and the service created an idea and a post awaiting approval. The answer on the page named both ids. About 62 s from capture to insertion (three model requests and one tool call), $0.0009 for the final request. One handwriting error: "frakt" was read as "frukt".
+- Not yet validated: the yes-and-tap-again confirmation for tools that need it, other MCP servers such as Composio, and the free model with tools.
+
+## openremark 0.1.1 — reMarkable 2, OS 3.29.1.0 (2026-10-31)
+
+- Tablet: reMarkable 2, OS 3.29.1.0 (Codex Linux 6.0.112), Qt 6.10.3.
+- Plugin built with the 3.28.0.172 rm2 SDK (Qt 6.10.3) in a Linux cloud session; host tests 9/9 PASS on Linux and macOS.
+- Vellum bootstrap, xovi 0.3.3, xovi-extensions 19.0.1 and rm-shot 1.2.0 installed; `rebuild_hashtable` set system version 3.29.1.0 and cached 20,138 entries.
+- After `xovi/start`: rm-shot loaded, `inkDiary.qmd` applied to `DocumentView.qml`, no Qt-version warning from the plugin.
+- Demo mode: the **Ask** button appears and the demo text is inserted below the writing.
+- Live answer via OpenRouter with `nvidia/nemotron-3.5-super-vl:free`: about 10 s from capture to insertion.
+- `plot y = x^2`: graph rendered on the tablet.
+- `Search weather in Stockholm today`: answer with sources from `url_citation` annotations on 0.1.1. On 0.1.0 the same request failed with "Answer incomplete": the model spent all 2,000 tokens on reasoning (`reasoning_tokens: 2000`, `finish_reason: length`). 0.1.1 raises the limit to 16,000; the same request then finished in 12 s with about 2,150 reasoning tokens.
+- Not yet validated at the time: the MCP proxy against a real MCP server (see 0.3.0 above), other models, other OS versions.
+
+## Upstream history (remarkable-chatgpt / remarkable-claude)
+
 - ARMv7 shared library compiled with the official 3.27-series reMarkable SDK.
 - Host tests passed: blank/occupied page boundaries, response parsing, incomplete/error/refusal handling, and handwriting font rendering.
 - Qt qmlformat parsed the inserted QML control successfully.

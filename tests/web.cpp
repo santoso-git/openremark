@@ -25,72 +25,96 @@ int main(int argc,char **argv){
   DiaryAnswer a;a.command=question;diaryRequireFreshSearch(a);assert(!a.search);
  }
  DiaryAnswer graph;graph.plot=true;graph.command="plot y=x today";diaryRequireFreshSearch(graph);assert(!graph.search);
- auto timedPayload=diarySearchPayload("Weather in Lowell MA","claude-sonnet-5-5","America/New_York",example);
- assert(timedPayload["system"].toString().contains("2026-10-19 09:42 PM EDT"));
- auto payload=diarySearchPayload("Search today's weather in Boston","claude-sonnet-5-5");
- auto tool=payload["tools"].toArray()[0].toObject();assert(tool["type"]=="web_search_20250305"&&tool["name"]=="web_search");
- // Opus 5.5 / Sonnet 5.5 reject forced tool_choice; the system prompt asks for the search instead.
- assert(!payload.contains("tool_choice"));assert(!payload.contains("output_config"));
- assert(payload["messages"].toArray()[0].toObject()["content"]=="Search today's weather in Boston");
- assert(diaryWithFallbacks(payload).value("fallbacks")=="default");
- assert(!diaryWithFallbacks(diarySearchPayload("q","claude-haiku-5-5")).contains("fallbacks"));
+ auto timedPayload=diarySearchPayload("Weather in Lowell MA","google/gemma-4-31b-it:free","America/New_York",example);
+ auto timedMessages=timedPayload["messages"].toArray();
+ assert(timedMessages[0].toObject()["role"]=="system"&&timedMessages[0].toObject()["content"].toString().contains("2026-10-19 09:42 PM EDT"));
+ // OpenRouter's web plugin does the search; no tools, no structured output.
+ auto payload=diarySearchPayload("Search today's weather in Boston","google/gemma-4-31b-it:free");
+ auto plugin=payload["plugins"].toArray()[0].toObject();assert(plugin["id"]=="web"&&plugin["max_results"].toInt()==3);
+ // OpenRouter's default search prompt asks for markdown source links; the app lists sources itself (2026-10-31: sources appeared twice).
+ assert(!plugin["search_prompt"].toString().isEmpty());assert(!plugin["search_prompt"].toString().contains("markdown link",Qt::CaseInsensitive));
+ assert(!payload.contains("tools")&&!payload.contains("response_format"));
+ assert(payload["max_tokens"].toInt()==16000);
+ assert(payload["messages"].toArray()[1].toObject()["content"]=="Search today's weather in Boston");
  auto route=decodeDiaryAnswer(R"JSON({"kind":"search","text":"weather in Boston today"})JSON");assert(route.search&&!route.plot);
- // Shape of the documented Messages API web search response: preamble, search call, results, cited text.
- auto root=QJsonDocument::fromJson(R"JSON({"role":"assistant","stop_reason":"end_turn","content":[
-  {"type":"text","text":"I'll search for when Claude Shannon was born."},
-  {"type":"server_tool_use","id":"srvtoolu_01","name":"web_search","input":{"query":"claude shannon birth date"}},
-  {"type":"web_search_tool_result","tool_use_id":"srvtoolu_01","content":[{"type":"web_search_result","url":"https://en.wikipedia.org/wiki/Claude_Shannon","title":"Claude Shannon - Wikipedia","encrypted_content":"Eqgf","page_age":"April 30, 2025"}]},
-  {"type":"text","text":"Based on the search results, "},
-  {"type":"text","text":"Claude Shannon was born on April 30, 1916, in Petoskey, Michigan","citations":[{"type":"web_search_result_location","url":"https://en.wikipedia.org/wiki/Claude_Shannon","title":"Claude <Shannon> - Wikipedia","encrypted_index":"Eo8B","cited_text":"Claude Elwood Shannon (April 30, 1916 ..."}]},
-  {"type":"text","text":". He also studied at MIT.","citations":[{"type":"web_search_result_location","url":"https://example.org/a?x=1&y=2","title":"","encrypted_index":"x","cited_text":"..."},{"type":"web_search_result_location","url":"https://en.wikipedia.org/wiki/Claude_Shannon","title":"Claude Shannon - Wikipedia","encrypted_index":"y","cited_text":"..."}]}
- ]})JSON").object();
- auto result=parseDiarySearch(root);
- assert(result.text=="Based on the search results, Claude Shannon was born on April 30, 1916, in Petoskey, Michigan [1]. He also studied at MIT. [2][1]");
- assert(result.sources.size()==2);assert(result.sources[1].title=="example.org");
- result.checkedAt=local;assert(diarySourcesText(result).contains("Checked at: "+local));
- auto html=diarySourcesHtml(result);assert(html.contains("09:42 PM EDT"));assert(html.contains("href=\"https://example.org/a?x=1&amp;y=2\""));assert(!html.contains("Claude <Shannon>"));
- assert(diarySourcesText(result).contains("https://en.wikipedia.org/wiki/Claude_Shannon"));
- // A turn with no search result must not be shown as a web answer.
- auto content=root["content"].toArray();content.removeAt(2);root["content"]=content;
- bool rejected=false;try{parseDiarySearch(root);}catch(...){rejected=true;}assert(rejected);
- // Search errors arrive as HTTP 200 with an error object instead of a result list.
- auto failed=QJsonDocument::fromJson(R"JSON({"stop_reason":"end_turn","content":[{"type":"server_tool_use","id":"s","name":"web_search","input":{"query":"q"}},
-  {"type":"web_search_tool_result","tool_use_id":"s","content":{"type":"web_search_tool_result_error","error_code":"too_many_requests"}},{"type":"text","text":"Sorry."}]})JSON").object();
- try{parseDiarySearch(failed);assert(false);}catch(const std::runtime_error &e){assert(QString(e.what()).contains("too_many_requests"));}
- // A completed search with uncited text keeps the answer and reports missing links.
- auto uncited=QJsonDocument::fromJson(R"JSON({"stop_reason":"end_turn","content":[{"type":"web_search_tool_result","tool_use_id":"s","content":[]},{"type":"text","text":"Unverified"}]})JSON").object();
- result=parseDiarySearch(uncited);assert(result.text=="Unverified");assert(result.sources.isEmpty());
- assert(diarySourcesText(result).contains("no source links"));assert(diarySourcesHtml(result).contains("no source links"));
- // pause_turn resumes by sending the paused assistant content back unchanged.
- auto paused=QJsonDocument::fromJson(R"JSON({"stop_reason":"pause_turn","content":[{"type":"server_tool_use","id":"s","name":"web_search","input":{"query":"q"}}]})JSON").object();
- rejected=false;try{parseDiarySearch(paused);}catch(...){rejected=true;}assert(rejected);
- auto resumed=diaryContinueSearch(payload,paused);auto msgs=resumed["messages"].toArray();
- assert(msgs.size()==2&&msgs[1].toObject()["role"]=="assistant"&&msgs[1].toObject()["content"]==paused["content"]);
+ // Sources come from url_citation annotations, de-duplicated; Markdown links in the text lose their URL.
+ auto loadFixture=[](const char *path){QFile f(path);assert(f.open(QIODevice::ReadOnly));return QJsonDocument::fromJson(f.readAll()).object();};
+ auto result=parseDiarySearch(loadFixture("tests/fixtures/search-openrouter.json"));
+ assert(result.sources.size()==2);assert(result.sources[0].title=="Burj Khalifa - Wikipedia");assert(result.sources[1].title=="example.org");
+ assert(result.text=="The **Burj Khalifa** in Dubai is the tallest building at 828 m, per Wikipedia.");
+ assert(!result.text.contains("](http"));
+ // Sources stay off the page; the saved .png.html file keeps them with the time of the check.
+ assert(!result.text.contains("[1]"));
+ result.checkedAt=local;
+ auto html=diarySourcesHtml(result);assert(html.contains("09:42 PM EDT"));assert(html.contains("href=\"https://example.org/a?x=1&amp;y=2\""));
+ assert(html.contains("https://en.wikipedia.org/wiki/Burj_Khalifa"));
+ // A trailing list of source links written by the model is dropped; a link inside a sentence keeps its label.
+ {auto listed=parseDiarySearch(QJsonDocument::fromJson(R"J({"choices":[{"finish_reason":"stop","message":{"content":"Jönköping is the largest, per [scb.se](https://scb.se/x).\n\n[visitsmaland.se](https://www.visitsmaland.se/a)\n- [en.wikipedia.org](https://en.wikipedia.org/wiki/B)\nSources: [a.se](https://a.se), [b.com](https://b.com)\nhttps://example.org/c","annotations":[{"type":"url_citation","url_citation":{"url":"https://www.visitsmaland.se/a","title":"Visit Småland"}}]}}]})J").object());
+  assert(listed.text=="Jönköping is the largest, per scb.se.");}
+ // The model's own [n] markers go: no source list is shown on the page.
+ {auto marked=parseDiarySearch(QJsonDocument::fromJson(R"J({"choices":[{"finish_reason":"stop","message":{"content":"Kalmar och Växjö [1][2]. Gränna [3].","annotations":[{"type":"url_citation","url_citation":{"url":"https://a.se/x","title":"A"}}]}}]})J").object());
+  assert(marked.text=="Kalmar och Växjö. Gränna.");}
+ // Anthropic's native search: the line written before the search is glued to the answer without a space (2026-10-31).
+ {auto glued=parseDiarySearch(QJsonDocument::fromJson(R"J({"choices":[{"finish_reason":"stop","message":{"content":"Jag söker efter aktuella uppgifter.Frankrikes största vinregion är Languedoc-Roussillon.\n\n- **Bordeaux:** störst i kvalitetsvin."}}]})J").object());
+  assert(glued.text=="Frankrikes största vinregion är Languedoc-Roussillon.\n\n- **Bordeaux:** störst i kvalitetsvin.");}
+ {auto umlaut=parseDiarySearch(QJsonDocument::fromJson(R"J({"choices":[{"finish_reason":"stop","message":{"content":"Let me search for that.Älvsborg is the answer."}}]})J").object());
+  assert(umlaut.text=="Älvsborg is the answer.");}
+ // Ordinary sentences, abbreviations and a lone sentence stay.
+ {auto plain=parseDiarySearch(QJsonDocument::fromJson(R"J({"choices":[{"finish_reason":"stop","message":{"content":"Kalmar. Växjö.Gränna"}}]})J").object());
+  assert(plain.text=="Kalmar. Växjö.Gränna");}
+ {auto lone=parseDiarySearch(QJsonDocument::fromJson(R"J({"choices":[{"finish_reason":"stop","message":{"content":"Sunny, 12 °C in Lund."}}]})J").object());
+  assert(lone.text=="Sunny, 12 °C in Lund.");}
+ // Native search ignored the 80-word limit and quoted English sources word for word.
+ {auto system=diarySearchPayload("x","m")["messages"].toArray()[0].toObject()["content"].toString();
+  assert(system.contains("Write nothing before or during the search"));
+  assert(system.contains("Never quote a source word for word"));
+  assert(system.contains("Hard limit: 60 words"));}
+ // No annotations: the answer stays and the saved HTML says that links are missing.
+ auto none=parseDiarySearch(QJsonDocument::fromJson(R"({"choices":[{"finish_reason":"stop","message":{"content":"Sunny"}}]})").object());
+ assert(none.text=="Sunny"&&none.sources.isEmpty());
+ assert(diarySourcesHtml(none).contains("no source links"));
+ // Unsafe or malformed citation URLs are rejected rather than shown.
+ bool rejected=false;
+ try{parseDiarySearch(QJsonDocument::fromJson(R"J({"choices":[{"finish_reason":"stop","message":{"content":"x","annotations":[{"type":"url_citation","url_citation":{"url":"javascript:alert(1)","title":"t"}}]}}]})J").object());}catch(...){rejected=true;}
+ assert(rejected);
+ // web_search:false answers search requests without a search; the default is on.
+ {DiaryAnswer a;a.search=true;a.text="weather";diaryApplySearchSetting(a,QJsonObject{{"web_search",false}});
+  assert(!a.search&&a.text=="Web search is turned off in config.json.");
+  DiaryAnswer b;b.search=true;b.text="weather";diaryApplySearchSetting(b,QJsonObject{});assert(b.search&&b.text=="weather");
+  DiaryAnswer c;c.text="plain";diaryApplySearchSetting(c,QJsonObject{{"web_search",false}});assert(!c.search&&c.text=="plain");}
  // Refusals and truncation surface as errors, not as answers.
- for(auto stop:{"refusal","max_tokens"}){auto r=uncited;r["stop_reason"]=stop;rejected=false;try{parseDiarySearch(r);}catch(...){rejected=true;}assert(rejected);}
- // Email routing (kinds email_check / email_search / email_reply)
- {auto c=decodeDiaryAnswer(R"({"kind":"email_check","command":"check my email today","text":""})");assert(c.emailCheck&&!c.search);
-  DiaryAnswer fresh=c;diaryRequireFreshSearch(fresh);assert(!fresh.search);
-  auto q=decodeDiaryAnswer(R"({"kind":"email_search","command":"find emails from Anna","email":{"query":"from:anna","full":false,"replies":[]}})");
-  assert(q.emailSearch&&q.emailQuery=="from:anna"&&!q.emailFull);
-  bool threw=false;try{decodeDiaryAnswer(R"({"kind":"email_search","email":{"query":" ","full":false,"replies":[]}})");}catch(const std::exception &e){threw=QString(e.what())=="Could not read what to search for";}assert(threw);
-  auto r=decodeDiaryAnswer(R"({"kind":"email_reply","command":"reply","email":{"query":"","full":false,"replies":[{"n":2,"instruction":"sounds good"},{"n":3,"instruction":"skip"}]}})");
-  assert(r.emailReplies.size()==2&&r.emailReplies[0]==qMakePair(2,QString("sounds good"))&&r.emailReplies[1].second=="skip");
-  threw=false;try{decodeDiaryAnswer(R"({"kind":"email_reply","email":{"query":"","full":false,"replies":[]}})");}catch(const std::exception &e){threw=QString(e.what())=="Write reply N: ... next to an email";}assert(threw);
-  auto kinds=diaryAnswerFormat()["schema"].toObject()["properties"].toObject()["kind"].toObject()["enum"].toArray();
-  for(auto k:{"email_check","email_search","email_reply"})assert(kinds.contains(k));
-  assert(diaryAnswerFormat()["schema"].toObject()["required"].toArray().contains("email"));
-  auto prompt=diaryReadingPrompt();assert(prompt.contains("kind=email_check")&&prompt.contains("kind=email_search")&&prompt.contains("kind=email_reply"));
-  assert(prompt.contains("Handwritten corrections drawn directly on a printed draft"));}
+ for(auto finish:{"length","content_filter"}){rejected=false;
+  try{parseDiarySearch(QJsonDocument::fromJson(QString(R"({"choices":[{"finish_reason":"%1","message":{"content":"x"}}]})").arg(finish).toUtf8()).object());}catch(...){rejected=true;}
+  assert(rejected);}
+ // The reading request is a chat completion with the page as an image and the answer schema as response_format.
+ {auto p=diaryReadingPayload("PNG",QJsonObject{{"model","google/gemma-4-31b-it:free"}});
+  assert(p["model"]=="google/gemma-4-31b-it:free");// Reasoning models spend most of the budget thinking (2000 of 2000 tokens on 2026-10-31); leave room for the answer.
+  assert(p["max_tokens"].toInt()==16000);
+  auto messages=p["messages"].toArray();assert(messages.size()==2&&messages[0].toObject()["role"]=="system");
+  auto image=messages[1].toObject()["content"].toArray()[1].toObject();assert(image["type"]=="image_url");
+  assert(image["image_url"].toObject()["url"].toString()=="data:image/png;base64,"+QString::fromLatin1(QByteArray("PNG").toBase64()));
+  auto format=p["response_format"].toObject();assert(format["type"]=="json_schema");
+  auto schema=format["json_schema"].toObject();assert(schema["name"]=="diary_answer"&&schema["strict"].toBool());
+  assert(schema["schema"].toObject()==diaryAnswerSchema());
+  assert(!p.contains("system")&&!p.contains("output_config"));
+  // Without structured outputs the schema moves into the prompt.
+  auto loose=diaryWithoutFormat(p);assert(!loose.contains("response_format"));
+  auto system=loose["messages"].toArray()[0].toObject()["content"].toString();
+  assert(system.startsWith(messages[0].toObject()["content"].toString()));
+  assert(system.contains("Return only a JSON object matching this schema")&&system.contains("\"kind\""));}
+ // Tolerant decoding: fences, a lead-in sentence and a missing plot range.
+ assert(decodeDiaryAnswer("Here you go: {\"kind\":\"text\",\"text\":\"Hi\",\"command\":\"q\"}").text=="Hi");
+ assert(decodeDiaryAnswer("```json\n{\"kind\":\"text\",\"text\":\"Hi\"}\n```").text=="Hi");
+ {auto plot=decodeDiaryAnswer(R"({"kind":"plot","command":"plot y=x^2","expression":"x^2"})");
+  assert(plot.plot&&plot.xmin==-5&&plot.xmax==5);}
+ // Email was removed: the prompt no longer routes to it.
+ assert(!diaryReadingPrompt().contains("email"));
  // A circled word plus "tell me about these" must scope to the marked words (2026-10-25 regression:
  // without this rule 4 of 5 live runs also answered about the unmarked basking shark).
- {auto reading=diaryReadingPayload(QByteArray("png"),QJsonObject{{"model","claude-sonnet-5-5"}})["system"].toString();
-  assert(reading.contains("Handwritten circles, underlines, brackets and lines drawn from text"));assert(reading.contains("answer only about the marked part"));}
- // Live claude-sonnet-5-5 response (encrypted fields stripped): search, results, cited text split over blocks.
- {QFile live("tests/fixtures/search-tallest-building.json");assert(live.open(QIODevice::ReadOnly));
-  auto tallest=parseDiarySearch(QJsonDocument::fromJson(live.readAll()).object());
-  assert(tallest.sources.size()==1&&tallest.sources[0].url=="https://en.wikipedia.org/wiki/List_of_tallest_buildings");
-  assert(tallest.text.startsWith("**Burj Khalifa**, Dubai, UAE."));assert(tallest.text.contains("completed in 2010. [1]"));}
+ {auto reading=diaryReadingPayload(QByteArray("png"),QJsonObject{{"model","google/gemma-4-31b-it:free"}})["messages"].toArray()[0].toObject()["content"].toString();
+  assert(reading.contains("Handwritten circles, underlines, brackets and lines drawn from text"));assert(reading.contains("answer only about the marked part"));
+  // An earlier Search line that already has an answer beneath it must not turn a new question into a search.
+  assert(reading.contains("A Search line that already has an answer beneath it belongs to an earlier question"));}
  if(argc>1){
   QFile input(QString::fromLocal8Bit(argv[1]));assert(input.open(QIODevice::ReadOnly));
   auto live=parseDiarySearch(QJsonDocument::fromJson(input.readAll()).object());live.checkedAt=local;
@@ -98,9 +122,40 @@ int main(int argc,char **argv){
   QFont font(QFontDatabase::applicationFontFamilies(id).first());font.setPixelSize(48);font.setWeight(QFont::Medium);QFontMetrics fm(font);
   for(auto ch:live.text)assert(ch.isSpace()||fm.inFont(ch));
   QRect box=fm.boundingRect(QRect(0,0,1150,10000),Qt::TextWordWrap,live.text);
-  QFont sourceFont("DejaVu Sans");sourceFont.setPixelSize(23);QFontMetrics sm(sourceFont);
-  QString sources=diarySourcesText(live);QRect sb=sm.boundingRect(QRect(0,0,1150,10000),Qt::TextWrapAnywhere,sources);
-  QImage image(1174,box.height()+54+sb.height(),QImage::Format_ARGB32);image.fill(Qt::white);QPainter p(&image);p.setPen(Qt::black);p.setFont(font);p.drawText(QRect(12,8,1150,box.height()+8),Qt::TextWordWrap,live.text);p.setFont(sourceFont);p.drawText(QRect(12,box.height()+34,1150,sb.height()+8),Qt::TextWrapAnywhere,sources);p.end();assert(image.save(argc>2?QString::fromLocal8Bit(argv[2]):QString("web-answer-preview.png")));
+  QImage image(1174,box.height()+24,QImage::Format_ARGB32);image.fill(Qt::white);QPainter p(&image);p.setPen(Qt::black);p.setFont(font);p.drawText(QRect(12,8,1150,box.height()+8),Qt::TextWordWrap,live.text);p.end();assert(image.save(argc>2?QString::fromLocal8Bit(argv[2]):QString("web-answer-preview.png")));
  }
- std::cout<<"PASS: Eastern date rollover and DST, checked-at timestamp, search routing, search payload, citation markers, escaped links, search errors, pause_turn resume, missing-source notice/no-search rejection\n";
+ // The second button: the latest Haiku without reasoning, for the page reading and the web search alike.
+ {QJsonObject base{{"api_key","k"},{"model","nvidia/nemotron-3.5-super-vl:free"},{"effort","high"}};
+  auto premium=diaryPremiumConfig(base);
+  assert(premium["model"]=="anthropic/claude-haiku-5.5"&&premium["effort"]=="none"&&premium["api_key"]=="k");
+  auto reading=diaryReadingPayload(QByteArray("png"),premium);
+  assert(reading["model"]=="anthropic/claude-haiku-5.5"&&reading["reasoning"].toObject()["effort"]=="none");
+  auto search=diaryWithEffort(diarySearchPayload("Weather in Lund",premium["model"].toString()),premium);
+  assert(search["model"]=="anthropic/claude-haiku-5.5"&&search["reasoning"].toObject()["effort"]=="none");
+  // config.json can name another model and effort for the button.
+  QJsonObject chosen=base;chosen["premium_model"]="anthropic/claude-sonnet-5.5";chosen["premium_effort"]="low";
+  assert(diaryPremiumConfig(chosen)["model"]=="anthropic/claude-sonnet-5.5"&&diaryPremiumConfig(chosen)["effort"]=="low");
+  // The Ask button is unchanged: its search has no reasoning unless effort is set.
+  assert(!diaryWithEffort(diarySearchPayload("x","m"),QJsonObject{{"model","m"}}).contains("reasoning"));}
+ // The tools button sends to the MCP proxy with its own key; Ask and the Haiku button keep OpenRouter.
+ {QJsonObject base{{"api_key","sk-or"},{"base_url","https://openrouter.ai/api/v1"},{"model","nvidia/nemotron-3.5-super-vl:free"},
+                   {"tools_base_url","https://proxy.example.com/v1"},{"tools_api_key","proxy-key"}};
+  auto tools=diaryToolsConfig(base);
+  assert(tools["base_url"]=="https://proxy.example.com/v1"&&tools["api_key"]=="proxy-key");
+  // Tool calls need a capable model: the premium model unless tools_model names another.
+  assert(tools["model"]=="anthropic/claude-haiku-5.5"&&tools["effort"]=="none");
+  QJsonObject chosen=base;chosen["tools_model"]="anthropic/claude-sonnet-5.5";
+  assert(diaryToolsConfig(chosen)["model"]=="anthropic/claude-sonnet-5.5");
+  // Without the proxy settings the button explains what is missing and never falls back to OpenRouter.
+  for(const char *missing:{"tools_base_url","tools_api_key"}) {
+   QJsonObject without=base;without.remove(missing);bool rejected=false;
+   try{diaryToolsConfig(without);}catch(const std::runtime_error &e){rejected=QString(e.what()).contains("tools_base_url");}
+   assert(rejected);
+  }}
+ // Email was removed: its kinds are unknown and the schema no longer mentions it.
+ {bool threw=false;
+  try{decodeDiaryAnswer(R"({"kind":"email_check","text":"","command":"check mail"})");}catch(const std::exception&){threw=true;}
+  assert(threw);}
+ assert(!QJsonDocument(diaryAnswerSchema()).toJson().contains("email"));
+ std::cout<<"PASS: Eastern date rollover and DST, checked-at timestamp, search routing, search payload, no citation markers, escaped links, url_citation sources, unsafe URLs, missing-source notice, refusals\n";
 }

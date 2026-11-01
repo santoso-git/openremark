@@ -15,16 +15,25 @@ int main(int argc,char **argv) {
     // exact production crop, including its unchanged bottom/right boundaries.
     const QRect captureArea=diaryCaptureArea();
     assert(captureArea==QRect(150,0,1174,1752));
-    // The Claude button sits under the toolbar's close button; it is masked out of every capture.
+    // The Ask button sits under the toolbar's close button; it is masked out of every capture.
     assert(diaryButtonRect()==QRect(1292,112,112,112));
     {QImage withButton(1404,1872,QImage::Format_RGB32);withButton.fill(Qt::white);
      {QPainter p(&withButton);p.fillRect(diaryButtonRect().adjusted(40,40,-40,-40),Qt::black);}
      diaryMaskControls(withButton);assert(lastInkRow(withButton.copy(captureArea))==-1);
      assert(withButton.pixelColor(1348,168)==QColor(Qt::white));
-     // The Send button (shown while drafts are pending) sits left of it and is masked too.
-     assert(diarySendButtonRect()==QRect(1180,112,124,112));
-     {QPainter p(&withButton);p.fillRect(diarySendButtonRect().adjusted(20,30,-20,-30),Qt::black);}
-     diaryMaskControls(withButton);assert(withButton.pixelColor(1240,168)==QColor(Qt::white));assert(lastInkRow(withButton.copy(captureArea))==-1);}
+     // Email was removed: writing where the Send button used to be is real ink and stays in the capture.
+     {QPainter p(&withButton);p.fillRect(QRect(1200,142,84,52),Qt::black);}
+     diaryMaskControls(withButton);assert(withButton.pixelColor(1240,168)==QColor(Qt::black));}
+    // The Haiku button sits one toolbar cell below Ask and is masked the same way.
+    assert(diaryPremiumButtonRect()==QRect(1292,224,112,112));
+    {QImage withButton(1404,1872,QImage::Format_RGB32);withButton.fill(Qt::white);
+     {QPainter p(&withButton);p.fillRect(diaryPremiumButtonRect().adjusted(40,40,-40,-40),Qt::black);}
+     diaryMaskControls(withButton);assert(lastInkRow(withButton.copy(captureArea))==-1);}
+    // The tools button (MCP proxy) sits one cell below the Haiku button and is masked too.
+    assert(diaryToolsButtonRect()==QRect(1292,336,112,112));
+    {QImage withButton(1404,1872,QImage::Format_RGB32);withButton.fill(Qt::white);
+     {QPainter p(&withButton);p.fillRect(diaryToolsButtonRect().adjusted(40,40,-40,-40),Qt::black);}
+     diaryMaskControls(withButton);assert(lastInkRow(withButton.copy(captureArea))==-1);}
     QImage screen(1404,1872,QImage::Format_RGB32);screen.fill(Qt::white);
     screen.setPixelColor(500,0,Qt::black);
     screen.setPixelColor(500,90,Qt::black);
@@ -71,14 +80,30 @@ int main(int argc,char **argv) {
         std::cout<<"Captured question bottom: "<<bottom<<"\n";
         assert(bottom>=480 && bottom<550);
     }
+    // Chat completions: the answer is choices[0].message.content; anything but a clean stop is an error.
     auto parse=[](const char *json) {return responseText(QJsonDocument::fromJson(json).object());};
-    assert(parse(R"({"stop_reason":"end_turn","content":[{"type":"thinking","thinking":"","signature":"x"},{"type":"text","text":"Hello"}]})")=="Hello");
-    // After a server-side fallback only the content after the fallback block is the answer.
-    assert(parse(R"({"stop_reason":"end_turn","content":[{"type":"text","text":"partial"},{"type":"fallback"},{"type":"text","text":"Rescued"}]})")=="Rescued");
-    for(auto invalid:{R"({"stop_reason":"max_tokens","content":[{"type":"text","text":"cut"}]})",R"({"stop_reason":"refusal","content":[]})",
-                      R"({"stop_reason":"end_turn","content":[]})",R"({"type":"error","error":{"type":"authentication_error","message":"invalid x-api-key"}})"}) {
+    // Each request's generation id is kept so its logged prompt and answer can be looked up at OpenRouter.
+    {QStringList ids;
+     diaryKeepGenerationId(ids,QJsonDocument::fromJson(R"({"id":"gen-1761-abcXYZ_09","choices":[]})").object());
+     diaryKeepGenerationId(ids,QJsonDocument::fromJson(R"({"choices":[]})").object());
+     diaryKeepGenerationId(ids,QJsonDocument::fromJson(R"({"id":"gen-1\n../x"})").object());
+     assert(ids==QStringList{"gen-1761-abcXYZ_09"});}
+    assert(parse(R"({"choices":[{"finish_reason":"stop","message":{"role":"assistant","content":" Hello "}}]})")=="Hello");
+    for(auto invalid:{R"({"choices":[{"finish_reason":"length","message":{"content":"cut"}}]})",
+                      R"({"choices":[{"finish_reason":"stop","message":{"content":""}}]})",
+                      R"({"choices":[{"finish_reason":"stop","message":{"content":null,"refusal":"no"}}]})",
+                      R"({"choices":[{"finish_reason":"content_filter","message":{"content":"x"}}]})",
+                      R"({"choices":[{"finish_reason":"tool_calls","message":{"content":null}}]})",
+                      R"({"choices":[]})",R"({"error":{"message":"invalid key"}})"}) {
         bool failed=false; try {parse(invalid);}catch(const std::runtime_error&){failed=true;} assert(failed);
     }
+    {bool cut=false;try{parse(R"({"choices":[{"finish_reason":"length","message":{"content":"cut"}}]})");}
+     catch(const std::runtime_error &e){cut=QString(e.what()).contains("Answer incomplete");}assert(cut);}
+    // Free models often fence their JSON or put a sentence before it.
+    assert(diaryExtractJson("```json\n{\"kind\":\"text\",\"text\":\"Hi\"}\n```")=="{\"kind\":\"text\",\"text\":\"Hi\"}");
+    assert(diaryExtractJson("Here you go: {\"a\":{\"b\":1}} done")=="{\"a\":{\"b\":1}}");
+    assert(diaryExtractJson("{\"a\":1}")=="{\"a\":1}");
+    assert(diaryExtractJson("no json here")=="no json here");
     int id=QFontDatabase::addApplicationFont(QFileInfo("fonts/Caveat.ttf").absoluteFilePath()); assert(id>=0);
     QFont font(QFontDatabase::applicationFontFamilies(id).first()); font.setPixelSize(48); font.setWeight(QFont::Medium);
     QFontMetrics fm(font);

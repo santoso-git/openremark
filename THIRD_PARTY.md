@@ -8,6 +8,6 @@
 
 New code in this project is GPL-3.0-only. The bundled LICENSE retains the upstream attribution and full license text.
 
-- Button icon (`icons/claude.svg`): a generic asterisk drawn for this fork, not a brand logo. The upstream OpenAI icon (Simple Icons, CC0-1.0) was removed.
+- Button icon (`icons/ask.svg`): a generic asterisk drawn for the remarkable-claude fork, not a brand logo. The upstream OpenAI icon (Simple Icons, CC0-1.0) was removed.
 
 - DejaVu Sans Mono: bundled for code rendering under the Bitstream Vera font license; see `fonts/DejaVu-LICENSE.txt`.

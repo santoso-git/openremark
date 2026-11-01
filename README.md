@@ -1,59 +1,60 @@
-# Ink Diary for Claude — reMarkable 2
+# openremark — reMarkable 2
 
-A fork of [mmoscat/remarkable-chatgpt](https://github.com/mmoscat/remarkable-chatgpt) (Ink Diary 4.1) that talks to Anthropic's Claude instead of OpenAI.
+Write a question in a notebook, tap **Ask**, and the answer appears beneath it in handwriting. openremark sends the visible page to any OpenAI-compatible chat API — by default [OpenRouter](https://openrouter.ai), which has free models that read images — and renders the answer locally in Caveat handwriting. No companion computer is needed after setup.
 
-**Installation and configuration: [INSTALL.md](INSTALL.md).**
+**Installation and configuration: [INSTALL.md](INSTALL.md).** Optional tools from MCP servers (Composio, your own services): [proxy/README.md](proxy/README.md).
 
-A Claude button inside the standard notebook app. Tap it to send the visible notebook area to the Claude API over the tablet's Wi-Fi, render the answer in Caveat handwriting, and insert it beneath your writing as a single handwriting image. No companion computer is needed after setup.
+A fork of [jonaslaberg/remarkable-claude](https://github.com/jonaslaberg/remarkable-claude), itself a fork of [mmoscat/remarkable-chatgpt](https://github.com/mmoscat/remarkable-chatgpt) (Ink Diary 4.1). GPL-3.0.
 
-Target: **reMarkable 2**, any OS version whose Qt is binary compatible with the SDK used for the build. The checked-in `bin/ink-diary.so` is built with the **3.28.0.172** SDK (Qt 6.10.3). This is a development prototype.
+Target: **reMarkable 2**, any OS version whose Qt is binary compatible with the SDK used for the build. The checked-in `bin/ink-diary.so` is built with the **3.28.0.172** SDK. Which OS versions it has actually run on is recorded in [VALIDATION.md](VALIDATION.md). This is a development prototype.
 
-**Port status:** built with the 3.28.0.172 SDK, host unit tests pass, and live web search has been verified against the Claude API. It has not yet been run on a tablet. See VALIDATION.md.
+### Changes from remarkable-claude
 
-### Changes from upstream
+- Requests go to `{base_url}/chat/completions` with `Authorization: Bearer`. `base_url` defaults to `https://openrouter.ai/api/v1`; any OpenAI-compatible service works, including Ollama or LM Studio on your own network. Plain `http` is only accepted for local network addresses.
+- The page is read with an image message and the answer schema as `response_format` (structured outputs). Models without structured outputs are retried with the schema in the prompt, and the JSON is read tolerantly.
+- Web search uses OpenRouter's web plugin; sources come from its `url_citation` annotations.
+- Email was removed. The button is called **Ask** and has no brand logo.
 
-- Requests go to `https://api.anthropic.com/v1/messages` (`x-api-key`, `anthropic-version: 2023-06-01`). Notebook reading uses Claude vision plus structured outputs (`output_config.format`) with the same answer schema as upstream.
-- Web search uses Anthropic's server-side `web_search` tool. Citations come from the API's `web_search_result_location` metadata.
-- Email: triage, search and handwritten replies with a Send button (Gmail, app password).
-- AI image generation (comics, illustrations) was removed because the Claude API has no image-generation endpoint. Such requests get a short text reply suggesting a diagram instead. Plots, Mermaid flowcharts, sequence diagrams, Venn diagrams, checklists, tables and calendars still render locally on the tablet.
-- Default model `claude-sonnet-5-5`. On Sonnet 5.5, Opus 5.5, Opus 5 and Fable 5.1, requests opt into server-side refusal fallbacks (`fallbacks: "default"`).
+## Free models
+
+OpenRouter model ids ending in `:free` cost nothing. List the free ones that read images:
+
+```sh
+curl -s https://openrouter.ai/api/v1/models | python3 -c "import json,sys; [print(m['id']) for m in json.load(sys.stdin)['data'] if m['id'].endswith(':free') and 'image' in m['architecture']['input_modalities']]"
+```
+
+The model must accept images; structured-output support makes answers more reliable. The default is `nvidia/nemotron-3.5-super-vl:free`. Free models are limited by OpenRouter to 20 requests a minute and **50 requests a day**, or 1000 a day once your account has bought at least 10 USD of credits in total. When the daily limit is reached the button says so. The free selection changes over time.
 
 ## Demo mode
 
-For offline testing, config.json may contain `{"demo_mode":true}`. Holding the icon shows **Claude (demo)** and inserts a fixed handwriting sample below your writing without making any API request. Running `configure.sh` replaces demo mode with the real API configuration.
+For offline testing, config.json may contain `{"demo_mode":true}`. Holding the icon shows **Ask (demo)** and inserts a fixed handwriting sample below your writing without making any API request. Running `configure.sh` replaces demo mode with the real API configuration.
 
 ## First use
 
-1. Configure your own Anthropic API key privately in the reManager terminal:
+1. Create an API key at [openrouter.ai/keys](https://openrouter.ai/keys) and configure it privately on the tablet:
    ```sh
    sh /home/root/.config/ink-diary/configure.sh
    ```
-   The key entry is hidden. The default model is `claude-sonnet-5-5`; any Claude model with vision and structured outputs can be entered (for example `claude-opus-5-5` or `claude-haiku-5-5`). API usage is billed to your Anthropic API account. No Claude.ai conversation is created.
+   It asks for the key (hidden), the base URL (Enter for OpenRouter), the model (Enter for the default) and your timezone, for example `Europe/Stockholm`.
 2. Enable Wi-Fi. Open a disposable notebook with a **blank or lightly ruled template**, in **portrait orientation**, at normal zoom.
 3. The answer image uses black handwriting independently of the selected pen.
 4. Write a short question anywhere in the visible capture area, including at the top, away from the left toolbar. Leave the lower half clear.
-5. Tap the **Claude icon** at the top right, under the toolbar's close button. Keep the page still and lift your pen until it finishes. While working, the icon becomes a stop square; tap it to cancel. Completion and error messages appear briefly above the button. Hold the icon to see its current status.
+5. Tap the **Ask** icon at the top right, under the toolbar's close button. Keep the page still and lift your pen until it finishes. While working, the icon becomes a stop square; tap it to cancel. Completion and error messages appear briefly above the button. Hold the icon to see its current status. The lightning-bolt button below it does the same with a paid model, by default `anthropic/claude-haiku-5.5` with reasoning off (`premium_model` and `premium_effort` in config.json). The wrench button below that sends the question through the optional [MCP proxy](proxy/README.md), so the model can use tools such as your calendar or your own services (`tools_base_url` and `tools_api_key`; see INSTALL.md). The other two buttons never go through the proxy.
 6. The answer is laid out in the Caveat handwriting font and inserted as one transparent image. Letters are not editable pen strokes. The native notebook app controls image sizing and selection.
 
 ## Web search
 
-Write `Search` followed by a question to explicitly request a web lookup, for example `Search what is the screen resolution of reMarkable 2?`. Questions about current facts, news, weather, prices and schedules are also routed to search automatically by the model. Include a location when needed. Ordinary timeless questions and function plots do not normally need a lookup.
+Write `Search` followed by a question to explicitly request a web lookup, for example `Search what is the screen resolution of reMarkable 2?`. Questions about current facts, news, weather, prices and schedules are also routed to search automatically by the model. Include a location when needed.
 
-The first request reads the page and routes the question. Search requests then make a second Messages API call with Anthropic's server-side `web_search` tool (`web_search_20250305`, at most three searches). Claude Opus 5.5 and Sonnet 5.5 do not accept a forced `tool_choice`, so the system prompt tells Claude to search. The plugin rejects an answer unless a search actually returned results. A search error (for example `too_many_requests`) is shown as a status message. Long searches that return `pause_turn` are resumed automatically up to three times.
+The first request reads the page and routes the question. Search requests then make a second request with OpenRouter's web plugin (`plugins: [{"id":"web"}]`, three results). Only the answer goes on the page. The sources, built from the response's `url_citation` annotations, and the time of the search are saved in a sibling `.png.html` file in `/home/root/.local/share/ink-diary/answers/` with clickable links. Links are never invented; when a search returns no annotations, that file says source links are unavailable.
 
-Answers include numbered citations and a source list built from the API's `web_search_result_location` citations (URL and title). Links are never invented. If the search ran but Claude cited nothing, the answer is shown with an explicit source-links-unavailable notice. Sources use a smaller print font for legibility. Notebook PNGs are not clickable. Each searched answer also has a sibling `.png.html` file in `/home/root/.local/share/ink-diary/answers/` with clickable citations; copy it through reManager to read in a browser. HTML text and links are escaped.
+Search requests use your local timezone (the `timezone` field), and a tablet-generated "Checked at" line in the `.png.html` file records when the response arrived.
 
-Search requests use your local timezone (default `America/New_York`, set with the optional `timezone` field), with automatic daylight-saving conversion. A tablet-generated "Checked at" line records when the response arrived; it is not the weather observation time.
-
-Search adds latency and costs $10 per 1,000 searches plus tokens. Web search can be disabled for your organization in the Claude Console; requests then fail with an HTTP 400 status message. Demo mode makes no API requests.
-
-## Email
-
-Write `check my email` to get one numbered, handwritten item per email that needs you (newsletters and notifications are counted, not listed), `find emails from Anna` to search with Gmail syntax, and `reply 2: …` (or a line from a summary to your note) to have Claude draft reply-all emails on the page. A **Send N** button appears while drafts are pending; one tap sends them all, threaded. Checks mark what they looked at as read; searches don't. Setup and details: INSTALL.md, section 8. Gmail is reached directly from the tablet over IMAP/SMTP with an app password stored only on the tablet; email text goes to the Claude API for summarising and drafting.
+**Web search costs money even with free models** (OpenRouter bills the search per request). Set `"web_search": false` in config.json to turn it off; search requests then get a short note instead.
 
 ## Plot commands
 
-Write `plot` followed by one equation, then tap the Claude icon. Examples:
+Write `plot` followed by one equation, then tap the Ask icon. Examples:
 
 - `plot y = x^2`
 - `plot y = sin(x)`
@@ -67,12 +68,12 @@ Answers and plots append below existing page content, extending beyond the visib
 
 ## Generated images and diagrams
 
-The Claude API cannot generate images, so upstream's artwork feature (comics, illustrations) is not available. Such requests get a short text reply, often suggesting a diagram instead.
+Image generation (comics, illustrations) is not available. Such requests get a short text reply, often suggesting a diagram instead.
 
 Diagrams are drawn locally with 3–4 px black lines and print labels. Examples:
 
 - `Create a Mermaid flowchart for making tea.`
-- `Create a sequence diagram of a tablet sending a question to Claude.`
+- `Create a sequence diagram of a tablet sending a question to a server.`
 - `Create a Venn diagram comparing cats and dogs.`
 
 The model produces a restricted Mermaid subset: flowcharts using TD/TB source syntax (up to 12 nodes and 24 arrows), laid out in a three-column wrapping grid, or sequence diagrams (2–5 participants and up to 20 messages). This is a native subset renderer, not the complete Mermaid JavaScript engine. Class, ER, Gantt, state diagrams, arbitrary Mermaid directives and mixed Markdown/diagram documents are not supported. Flowcharts support rectangular, rounded and diamond nodes, arrows and short edge labels. Complex branching/loop layouts may need a simpler request.
@@ -97,14 +98,14 @@ Follow **[INSTALL.md](INSTALL.md)**: SSH access, Vellum and xovi, copying this r
 ## Removal
 
 ```sh
-sh /home/root/ink-diary-claude/uninstall.sh
+sh /home/root/openremark/uninstall.sh
 ```
 
 Restart the UI afterwards. Your notebooks and existing Vellum packages remain. The API key/configuration remains at `/home/root/.config/ink-diary/config.json`; remove that specific file if you want to delete the saved credential.
 
 ## Privacy and network behavior
 
-Only tapping Claude starts a request. The cropped visible notebook image goes to `https://api.anthropic.com/v1/messages` over HTTPS with certificate verification. Anthropic's API data-retention policy applies; see https://platform.claude.com/docs/en/manage-claude/api-and-data-retention . Web searches send a standalone rewritten question in a second request. Screenshots use a private temporary directory and are deleted on normal completion/error. Answer PNGs remain in the root-only directory `/home/root/.local/share/ink-diary/answers` because the notebook app imports them asynchronously. An app crash may leave temporary files until reboot. Diagram rendering is local after the reading request. Notebook content and credentials are not printed to logs. The API key is saved locally with root-only permissions.
+Only tapping Ask starts a request. The cropped visible notebook image goes to `{base_url}/chat/completions` over HTTPS with certificate verification (plain http only on your local network). The data policy of OpenRouter and of the model provider it routes to applies; free models may log prompts. Web searches send the rewritten question in a second request. Screenshots use a private temporary directory and are deleted on normal completion/error. Answer PNGs remain in the root-only directory `/home/root/.local/share/ink-diary/answers` because the notebook app imports them asynchronously. Beside each answer, a `.png.ids` file holds the API's generation ids (one per request), so the request can be looked up in OpenRouter's activity log; with input/output logging enabled there, that includes the page image and the model's raw answer. Notebook content and credentials are not printed to logs. The API key is saved locally with root-only permissions.
 
 ## Build and test
 
@@ -125,9 +126,9 @@ Output: `bin/ink-diary.so` (ARMv7). Host checks require a C++ compiler and Qt6 C
 ./test.sh
 ```
 
-The checks cover placement boundaries, Messages API JSON handling (refusal, max_tokens, fallback, web search citations, search errors, pause_turn), and actual font rendering. They do not test live network requests or physical pen injection.
+The checks cover placement boundaries, chat-completions JSON handling (finish reasons, refusals, tolerant JSON, url_citation sources, 401/429 messages, base_url rules), configure.sh, and actual font rendering. They do not test live network requests or physical pen injection.
 
-Upstream provenance and licenses: THIRD_PARTY.md. API documentation: https://platform.claude.com/docs
+Upstream provenance and licenses: THIRD_PARTY.md. API documentation: https://openrouter.ai/docs
 
 Append-placement regression checks can also be run with `node tests/append.cjs`.
 
@@ -161,12 +162,12 @@ Both the notebook-reading stage and web-search stage receive the tablet's curren
 In reManager's terminal, run:
 
 ```sh
-sh /home/root/.config/ink-diary/configure.sh --model claude-opus-5-5
+sh /home/root/.config/ink-diary/configure.sh --model google/gemma-4-31b-it:free
 ```
 
-The `--model` option preserves the saved API key and every other configuration field. It validates the name and existing JSON, then saves atomically with owner-only permissions. No restart is needed; the next question uses the new model, for both notebook reading and web search. Use a Claude model with vision and structured outputs that your API account can access, for example `claude-sonnet-5-5` (default), `claude-opus-5-5` or `claude-haiku-5-5`. Costs and latency differ. Running the helper without `--model` repeats the full key and model setup.
+The `--model` option preserves the saved API key and every other configuration field. It validates the name and existing JSON, then saves atomically with owner-only permissions. No restart is needed; the next question uses the new model, for both notebook reading and web search. Use a model that accepts images, for example `nvidia/nemotron-3.5-super-vl:free` (default) or `google/gemma-4-31b-it:free`; see Free models above. Quality and latency differ. Running the helper without `--model` repeats the full key and model setup.
 
-For faster or cheaper answers without changing model, add `"effort":"low"` (or `medium`, `high`, `xhigh`, `max`) to config.json.
+For models that reason, `"effort":"low"` (or `medium`, `high`) in config.json is sent as OpenRouter's `reasoning.effort`.
 
 The prompts say the answer is rendered as GitHub Markdown. Tables and templates must be emitted outside fences; fences are reserved for programming code or explicitly requested raw Markdown source.
 

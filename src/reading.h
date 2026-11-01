@@ -6,6 +6,7 @@
 #include <QDateTime>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QJsonDocument>
 // The notebook-reading request: page image in, structured DiaryAnswer JSON out.
 inline QString diaryReadingPrompt() {
     return QString("This is a handwritten notebook page. Answer the latest unanswered question. "
@@ -60,6 +61,8 @@ inline QString diaryReadingPrompt() {
         "For unclear handwriting or unsupported equations (implicit, parametric, multiple functions, other variables), "
         "use kind=text with a brief clarification; do not invent or change the equation. "
         "Ignore old plot commands that already have a graph beneath them. "
+        "WEB SEARCH ROUTING: The latest question is the lowest handwriting with no answer beneath it. "
+        "A Search line that already has an answer beneath it belongs to an earlier question and does not make the latest question a search. "
         "WEB SEARCH ROUTING: If the latest question starts with Search (case-insensitive), or explicitly asks to look up, "
         "search, verify online, or find sources, ALWAYS return kind=search. Also use kind=search automatically for "
         "current/recent information, news, weather, prices, schedules, current officeholders or other facts requiring "
@@ -68,29 +71,54 @@ inline QString diaryReadingPrompt() {
         "expression is empty, xmin=-5,xmax=5. Do not invent missing locations or dates; ask clarification with kind=text. "
         "Examples: Who is the current president? -> search; Who is the US president today? -> search; "
         "What happened this week? -> search. Never answer these from training data. "
-        "Ordinary timeless questions and plot commands need no search. "
-        "EMAIL ROUTING: Requests to check, read or summarise the user's email or inbox use kind=email_check (this is the user's Gmail, not web search). "
-        "Requests to find, fetch, show or open particular emails (from a person, about a topic, from a period) use kind=email_search with email.query "
-        "written in Gmail search syntax (for example from:anna, subject:invoice, newer_than:30d, \"lease renewal\"); set email.full=true only when the user wants to read one email in full. "
-        "Handwritten replies to numbered email summaries or numbered drafts use kind=email_reply. Resolve 'reply 2', a line drawn from a summary to a note, "
-        "or a note written directly under a summary to that summary's number, and put each in email.replies as {n, instruction} with the user's words as instruction. "
-        "Collect every reply on the visible page that has no draft below it yet. 'n: <change>' next to a draft is a revision of draft n; 'n: skip' drops it (instruction=skip). "
-        "Handwritten corrections drawn directly on a printed draft (crossed-out words, insertions, replacements) are a revision of that draft: "
-        "use kind=email_reply with instruction describing each correction exactly, for example 'delete the line Best,' or 'replace Friday with Thursday'. "
-        "For email kinds text and expression are empty, xmin=-5,xmax=5, command transcribes the request and template/calendar are the empty defaults. "
-        "For non-email kinds always set email={query:empty string,full:false,replies:[]}.");
+        "Ordinary timeless questions and plot commands need no search.");
+}
+// Optional reasoning effort for models that support it (OpenRouter's unified reasoning parameter).
+inline QJsonObject diaryWithEffort(QJsonObject payload,const QJsonObject &config) {
+    QString effort=config.value("effort").toString();
+    if(!effort.isEmpty())payload.insert("reasoning",QJsonObject{{"effort",effort}});
+    return payload;
+}
+// The second button: premium_model and premium_effort, by default the latest Haiku without reasoning.
+inline QJsonObject diaryPremiumConfig(QJsonObject config) {
+    QString model=config.value("premium_model").toString().trimmed();
+    QString effort=config.value("premium_effort").toString().trimmed();
+    config["model"]=model.isEmpty()?QString("anthropic/claude-haiku-5.5"):model;
+    config["effort"]=effort.isEmpty()?QString("none"):effort;
+    return config;
+}
+// The third button: the MCP proxy at tools_base_url with its own key, so Ask and the Haiku button
+// never depend on the proxy. Tool calls need a capable model: the premium one unless tools_model says otherwise.
+inline QJsonObject diaryToolsConfig(QJsonObject config) {
+    QString url=config.value("tools_base_url").toString().trimmed();
+    QString key=config.value("tools_api_key").toString().trimmed();
+    if(url.isEmpty()||key.isEmpty())throw std::runtime_error("Set tools_base_url and tools_api_key for the tools button");
+    QString model=config.value("tools_model").toString().trimmed();
+    config=diaryPremiumConfig(config);
+    if(!model.isEmpty())config["model"]=model;
+    config["base_url"]=url;config["api_key"]=key;
+    return config;
 }
 inline QJsonObject diaryReadingPayload(const QByteArray &png,const QJsonObject &config,
                                        const QDateTime &now=QDateTime::currentDateTimeUtc()) {
     QString prompt=diaryCurrentContext(now,config.value("timezone").toString("America/New_York"))+diaryReadingPrompt();
-    QJsonObject output{{"format",diaryAnswerFormat()}};
-    QString effort=config.value("effort").toString();
-    if(!effort.isEmpty())output.insert("effort",effort);
-    QJsonObject payload{{"model",config.value("model").toString().trimmed()},{"max_tokens",16000},{"system",prompt},{"output_config",output},
-        {"messages",QJsonArray{QJsonObject{{"role","user"},{"content",QJsonArray{
-            QJsonObject{{"type","image"},{"source",QJsonObject{{"type","base64"},{"media_type","image/png"},
-                {"data",QString::fromLatin1(png.toBase64())}}}},
-            QJsonObject{{"type","text"},{"text","Read the latest unanswered question on this notebook page."}}
-        }}}}}};
-    return diaryWithFallbacks(payload);
+    QJsonObject payload{{"model",config.value("model").toString().trimmed()},{"max_tokens",16000},
+        {"messages",QJsonArray{QJsonObject{{"role","system"},{"content",prompt}},
+            QJsonObject{{"role","user"},{"content",QJsonArray{
+                QJsonObject{{"type","text"},{"text","Read the latest unanswered question on this notebook page."}},
+                QJsonObject{{"type","image_url"},{"image_url",QJsonObject{{"url","data:image/png;base64,"+QString::fromLatin1(png.toBase64())}}}}
+            }}}}},
+        {"response_format",QJsonObject{{"type","json_schema"},
+            {"json_schema",QJsonObject{{"name","diary_answer"},{"strict",true},{"schema",diaryAnswerSchema()}}}}}};
+    return diaryWithEffort(payload,config);
+}
+// For models without structured outputs: the schema moves into the system prompt.
+inline QJsonObject diaryWithoutFormat(QJsonObject payload) {
+    payload.remove("response_format");
+    auto messages=payload.value("messages").toArray();
+    auto system=messages[0].toObject();
+    system.insert("content",system.value("content").toString()+"\nReturn only a JSON object matching this schema: "
+        +QString::fromUtf8(QJsonDocument(diaryAnswerSchema()).toJson(QJsonDocument::Compact)));
+    messages[0]=system;payload.insert("messages",messages);
+    return payload;
 }

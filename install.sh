@@ -7,8 +7,8 @@ firmware=$(sed -n 's/^REMARKABLE_RELEASE_VERSION=//p' /usr/share/remarkable/upda
 # Firmware versions this plugin has been run on. Others may work: the plugin checks
 # Qt compatibility at load and probes the notebook app at runtime.
 case "$firmware" in
-    3.27.3.0) ;;
-    *) echo "Warning: Ink Diary has not been tested on OS $firmware. Build bin/ink-diary.so with the SDK for this OS version."
+    3.27.3.0|3.29.1.0) ;;
+    *) echo "Warning: openremark has not been tested on OS $firmware. Build bin/ink-diary.so with the SDK for this OS version."
        echo "If the notebook app misbehaves, run uninstall.sh and restart the UI." ;;
 esac
 [ -f bin/ink-diary.so ] || { echo 'Build the plugin first'; exit 1; }
@@ -16,8 +16,13 @@ esac
 base=/home/root/.config/ink-diary
 mkdir -p "$base"
 chmod 700 "$base"
-cp icons/claude.svg "$base/claude.svg"
-chmod 644 "$base/claude.svg"
+cp icons/ask.svg "$base/ask.svg"
+chmod 644 "$base/ask.svg"
+cp icons/ask-haiku.svg "$base/ask-haiku.svg"
+chmod 644 "$base/ask-haiku.svg"
+# The tools button keeps an icon of your own: replace ask-tools.svg on the tablet and reinstalls leave it.
+[ -f "$base/ask-tools.svg" ] || cp icons/ask-tools.svg "$base/ask-tools.svg"
+chmod 644 "$base/ask-tools.svg"
 cp fonts/DejaVuSansMono.ttf "$base/DejaVuSansMono.ttf"
 chmod 644 "$base/DejaVuSansMono.ttf"
 cp fonts/Caveat.ttf "$base/Caveat.ttf"

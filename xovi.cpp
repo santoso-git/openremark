@@ -65,15 +65,14 @@ extern void diary_start();
 extern void diary_status();
 extern void diary_cancel();
 extern void diary_probe();
-extern void diary_send();
 
 // XOVI metadata
-__attribute__((section(".xovi"))) const char *LINKTABLENAMES = "Crm-shot$screenshotHandler\0Irm-shot$screenshotHandler\0Ediary_start\0Ediary_status\0Ediary_cancel\0Ediary_probe\0Ediary_send\0\0";
-__attribute__((section(".xovi"))) const void *LINKTABLEVALUES[] = { (void *) 7, (void *) 0, (void *) 0, (void *) diary_start, (void *) diary_status, (void *) diary_cancel, (void *) diary_probe, (void *) diary_send };
+__attribute__((section(".xovi"))) const char *LINKTABLENAMES = "Crm-shot$screenshotHandler\0Irm-shot$screenshotHandler\0Ediary_start\0Ediary_status\0Ediary_cancel\0Ediary_probe\0\0";
+__attribute__((section(".xovi"))) const void *LINKTABLEVALUES[] = { (void *) 6, (void *) 0, (void *) 0, (void *) diary_start, (void *) diary_status, (void *) diary_cancel, (void *) diary_probe };
 __attribute__((section(".xovi"))) const struct XoViEnvironment *Environment = 0;
 __attribute__((section(".xovi"))) int EXTENSIONVERSION = 256;
 
-__attribute__((section(".xovi_info"))) const char __XOVIMETADATANAMES[] = "xovi-message-broker$simpleSignal\0ink-diary$start\0xovi-message-broker$version\0xovi-message-broker$simpleSignal\0ink-diary$status\0xovi-message-broker$version\0xovi-message-broker$simpleSignal\0ink-diary$cancel\0xovi-message-broker$version\0xovi-message-broker$simpleSignal\0ink-diary$probe\0xovi-message-broker$version\0xovi-message-broker$simpleSignal\0ink-diary$send\0xovi-message-broker$version\0";
+__attribute__((section(".xovi_info"))) const char __XOVIMETADATANAMES[] = "xovi-message-broker$simpleSignal\0ink-diary$start\0xovi-message-broker$version\0xovi-message-broker$simpleSignal\0ink-diary$status\0xovi-message-broker$version\0xovi-message-broker$simpleSignal\0ink-diary$cancel\0xovi-message-broker$version\0xovi-message-broker$simpleSignal\0ink-diary$probe\0xovi-message-broker$version\0";
 
 // Raw Metadata Entries
 const struct XoviMetadataEntry __XME0 = {
@@ -140,29 +139,12 @@ const struct XoviMetadataEntry __XME11A = {
     }
 };
 
-const struct XoviMetadataEntry __XME136 = {
-    .name = &__XOVIMETADATANAMES[310],
-    .type = 3,
-    .value = {
-        .sLength = 14, .s = &__XOVIMETADATANAMES[343]
-    }
-};
-
-const struct XoviMetadataEntry __XME166 = {
-    .name = &__XOVIMETADATANAMES[358],
-    .type = 1,
-    .value = {
-        .i = 1
-    }
-};
-
 
 // Metadata Chains
 const struct XoviMetadataEntry *__XMJ__XME0[] = { &__XME0, &__XME31, (struct XoviMetadataEntry *) 0 };
 const struct XoviMetadataEntry *__XMJ__XME4D[] = { &__XME4D, &__XME7F, (struct XoviMetadataEntry *) 0 };
 const struct XoviMetadataEntry *__XMJ__XME9B[] = { &__XME9B, &__XMECD, (struct XoviMetadataEntry *) 0 };
 const struct XoviMetadataEntry *__XMJ__XMEE9[] = { &__XMEE9, &__XME11A, (struct XoviMetadataEntry *) 0 };
-const struct XoviMetadataEntry *__XMJ__XME136[] = { &__XME136, &__XME166, (struct XoviMetadataEntry *) 0 };
 
 // Main metadata list
 __attribute__((section(".xovi"))) const struct XoviMetadataEntry **METADATAVALUES[] = {
@@ -172,8 +154,7 @@ __attribute__((section(".xovi"))) const struct XoviMetadataEntry **METADATAVALUE
     (const struct XoviMetadataEntry **) &__XMJ__XME0,
     (const struct XoviMetadataEntry **) &__XMJ__XME4D,
     (const struct XoviMetadataEntry **) &__XMJ__XME9B,
-    (const struct XoviMetadataEntry **) &__XMJ__XMEE9,
-    (const struct XoviMetadataEntry **) &__XMJ__XME136, (const struct XoviMetadataEntry **) 1
+    (const struct XoviMetadataEntry **) &__XMJ__XMEE9, (const struct XoviMetadataEntry **) 1
 };
 
 // Resources

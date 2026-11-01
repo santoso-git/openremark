@@ -1,0 +1,19 @@
+{
+  "listen": 8787,
+  "client_key": "${OPENREMARK_CLIENT_KEY}",
+  "upstream": {
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key": "${OPENROUTER_API_KEY}"
+  },
+  "max_tool_steps": 5,
+  "pending_ttl_minutes": 10,
+  "mcp_servers": [
+    {
+      "name": "composio",
+      "url": "https://connect.composio.dev/mcp",
+      "headers": { "x-consumer-api-key": "${COMPOSIO_CONSUMER_KEY}" },
+      "confirm": [],
+      "confirm_destructive": true
+    }
+  ]
+}
