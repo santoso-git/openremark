@@ -2,7 +2,11 @@
 
 openremark is a fork of [jonaslaberg/remarkable-claude](https://github.com/jonaslaberg/remarkable-claude), which is itself a fork of [mmoscat/remarkable-chatgpt](https://github.com/mmoscat/remarkable-chatgpt) (Ink Diary 4.1). Newest first. The 2026-10-25 entry is remarkable-claude's own history relative to remarkable-chatgpt.
 
-## openremark 0.3.0 (not yet released)
+## openremark 0.3.1 (2026-11-01)
+
+- README rewritten: a short pitch with example images, what openremark adds, the three buttons, a step-by-step guide to adding an MCP server that a person or a coding agent can follow, one settings table, and the details in collapsible sections. No code changes; the binaries are those of 0.3.0.
+
+## openremark 0.3.0 (2026-11-01)
 
 - A third button, a wrench under the Haiku button, sends the question through the optional MCP proxy (`tools_base_url`, `tools_api_key`, optionally `tools_model`, which defaults to the Haiku button's model). **Ask** and the Haiku button keep going straight to OpenRouter and do not depend on the proxy. All three buttons are masked out of what the model reads.
 - The proxy can read its whole config from the environment variable `CONFIG_JSON`, for hosts such as Coolify that do not mount files, and its image includes `curl` for health checks.
