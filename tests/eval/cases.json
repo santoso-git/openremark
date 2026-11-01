@@ -1,0 +1,8 @@
+{
+  "correction_word": {"page": [["q", "Var ligger Önst?"], ["a", "Ingen plats som heter exakt Önst hittades. Kanske menar du Önsta i Västerås kommun?"], ["q", "Orust"]], "mention": "Orust", "avoid": "Önst"},
+  "correction_no": {"page": [["q", "Var ligger Önst?"], ["a", "Ingen plats som heter exakt Önst hittades. Kanske menar du Önsta i Västerås kommun?"], ["q", "Nej, Orust"]], "mention": "Orust", "avoid": "Önst"},
+  "new_question": {"page": [["q", "Var ligger Orust?"], ["a", "Orust är en ö och kommun i Bohuslän, Västra Götalands län, på västkusten norr om Göteborg."], ["q", "Vad är 12 gånger 7?"]], "mention": "84", "avoid": "Bohuslän"},
+  "follow_up": {"page": [["q", "Var ligger Orust?"], ["a", "Orust är en ö och kommun i Bohuslän, Västra Götalands län, på västkusten norr om Göteborg."], ["q", "Och Tjörn?"]], "mention": "Tjörn"},
+  "single_name": {"page": [["q", "Var ligger Orust?"]], "mention": "Orust"},
+  "correction_term": {"page": [["q", "Vad betyder lagom?"], ["a", "Lagom betyder lagom mycket: inte för mycket och inte för lite."], ["q", "hygge"]], "mention": "ygge"}
+}

@@ -109,6 +109,16 @@ int main(int argc,char **argv){
   assert(plot.plot&&plot.xmin==-5&&plot.xmax==5);}
  // Email was removed: the prompt no longer routes to it.
  assert(!diaryReadingPrompt().contains("email"));
+ // A lone word or name under an answer corrects the question above it (2026-11-01: "Orust" after a wrong answer about "Önst").
+ assert(diaryReadingPrompt().contains("A short line under an earlier answer, such as a single word or name, usually corrects that question"));
+ assert(diaryReadingPrompt().contains("never transcribe these instructions"));
+ // The search query is written in the user's own language, or the search answer follows it into English (2026-11-01 eval).
+ assert(diaryReadingPrompt().contains("written in the same language as the handwriting, never translated"));
+ // Search answers: the question's language from the first word, no unconfirmed asides (the same night: an English opening, a "(…?)" aside).
+ {auto system=diarySearchPayload("Var ligger Orust?","m")["messages"].toArray()[0].toObject()["content"].toString();
+  assert(system.contains("Write the whole answer in the language of the question, from the first word"));
+  assert(system.contains("Leave out anything you cannot confirm from the results; never write that you cannot confirm something"));
+  assert(system.contains("Never answer with a checklist, a search query or a note to yourself"));}
  // A circled word plus "tell me about these" must scope to the marked words (2026-10-25 regression:
  // without this rule 4 of 5 live runs also answered about the unmarked basking shark).
  {auto reading=diaryReadingPayload(QByteArray("png"),QJsonObject{{"model","google/gemma-4-31b-it:free"}})["messages"].toArray()[0].toObject()["content"].toString();

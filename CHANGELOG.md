@@ -2,6 +2,14 @@
 
 openremark is a fork of [jonaslaberg/remarkable-claude](https://github.com/jonaslaberg/remarkable-claude), which is itself a fork of [mmoscat/remarkable-chatgpt](https://github.com/mmoscat/remarkable-chatgpt) (Ink Diary 4.1). Newest first. The 2026-10-25 entry is remarkable-claude's own history relative to remarkable-chatgpt.
 
+## openremark 0.3.2 (2026-11-01)
+
+- A short line under an earlier answer, such as a single word or name, is read as a correction of that question. Before this, the free model answered the old, misread question again, and once transcribed its own instructions as the question.
+- Names and rare words are read letter by letter, matched to a real place or name where possible.
+- A search query keeps the language of the handwriting. In an eval Haiku had translated it to English, which made the search answer English too.
+- `tests/eval/` sends synthetic pages to real models and checks what they read; see its README. With the old prompt, a lone corrected name under a wrong answer failed for both the free model and Haiku; with the new one Haiku handled it in 5 of 5 runs.
+- Web answers are written in the question's language from the first word, leave out what the results cannot confirm instead of saying so, and are never a checklist, a search query or a note to the model itself.
+
 ## openremark 0.3.1 (2026-11-01)
 
 - README rewritten: a short pitch with example images, what openremark adds, the three buttons, a step-by-step guide to adding an MCP server that a person or a coding agent can follow, one settings table, and the details in collapsible sections. No code changes; the binaries are those of 0.3.0.

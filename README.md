@@ -56,6 +56,8 @@ While it works, the button shows a stop square; tap it to cancel. To remove an a
 - **Diagrams:** `Create a flowchart for making tea`, a sequence diagram, or a Venn diagram with 2 or 3 sets.
 - **Templates:** `Create a 10 item checklist`, a table with blank rows, or `Create a calendar for November 2026 with each day cell 3 rows tall`.
 
+Write in the language you want the answer in. A single word such as `Search UEFA` shows no language and may be answered in English; `Search ge mig info om UEFA` is answered in Swedish. If the model misreads a word, write the corrected word under its answer and tap again.
+
 ## Add an MCP server
 
 Follow these steps in order. They work the same for a person or a coding agent. Every field is described in [proxy/README.md](proxy/README.md).

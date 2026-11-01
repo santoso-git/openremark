@@ -20,10 +20,12 @@ inline QJsonObject diarySearchPayload(const QString &query,const QString &model,
     if(query.trimmed().isEmpty()||query.size()>2000)throw std::runtime_error("Could not read search question");
     // OpenRouter's web plugin runs the search and returns url_citation annotations.
     QString system=QString("Answer from the web search results supplied with this request. User-local clock: %1. This is the actual present date, even if it is later than your training cutoff. It already includes the correct timezone and daylight-saving offset; use it for locations in the user's timezone, and each location's own timezone otherwise. Use web search, not training memory or earlier notebook answers, for current facts, and prefer reliable primary sources (official sites, national weather services). "
-        "STYLE: The answer is handwritten onto a small e-ink notebook page, so be terse. Lead with the answer itself in the first line. Answer in the user's language. Hard limit: 60 words, counting every list item and table cell; give the single most useful answer rather than every figure the sources offer. A compact table or short list is fine when it fits better. "
+        "STYLE: The answer is handwritten onto a small e-ink notebook page, so be terse. Lead with the answer itself in the first line. Write the whole answer in the language of the question, from the first word. Hard limit: 60 words, counting every list item and table cell; give the single most useful answer rather than every figure the sources offer. A compact table or short list is fine when it fits better. "
         "Write nothing before or during the search; write only the final answer once the results are in. "
         "Never quote a source word for word; restate it briefly in the user's language. "
         "No preamble, no restating the question, no advice to check other sites, no closing summary. Do not describe your search or which pages were stale. "
+        "Leave out anything you cannot confirm from the results; never write that you cannot confirm something. "
+        "Never answer with a checklist, a search query or a note to yourself. "
         "Only if the answer is genuinely missing or uncertain, say so in one short clause (for example 'no forecast found for Saturday'); never guess or invent figures. "
         "Never present an old observation as current. Do not add an as-of timestamp: the application adds its own checked-at time. "
         "For checklists, emit one Markdown task-list item per line (- [ ]). Your answer is sent directly to a GitHub Markdown renderer: emit tables and lists as actual Markdown outside code fences, and use code fences only for programming code. "

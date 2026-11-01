@@ -39,3 +39,4 @@ vellum-ref/
 
 # Proxy
 proxy/node_modules/
+tests/eval/pages/

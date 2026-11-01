@@ -1,5 +1,10 @@
 # Validation status
 
+## openremark 0.3.2 — reMarkable 2, OS 3.29.1.0 (2026-11-01)
+
+- Prompt changes checked with `tests/eval/` on typeset pages: a lone corrected name under a wrong answer failed with the old prompt for both the free model and Haiku, and passed with the new one for Haiku in 5 of 5 runs.
+- On the tablet with real handwriting: "Var ligger Tjörn?" (free model) and "Vem tomten?" (Haiku) answered correctly in Swedish. "Search UEFA" was answered in English, since a single word shows no language; "Search Ge mig info on FIFA" was answered in Swedish.
+
 ## openremark 0.3.0 and the MCP proxy — reMarkable 2, OS 3.29.1.0 (2026-11-01)
 
 - Proxy at 2011570 running in Docker (Coolify) on a VPS behind HTTPS, configured through `CONFIG_JSON`, with one MCP server: the author's own content tool, reached with a personal key over Streamable HTTP. Proxy tests 46/46 and typecheck pass.
